@@ -107,6 +107,10 @@ agn_dev_/
 - [x] **Étape 3 : Frontière `contracts/` & Premier Module `native/`**
   - [x] Initialisation de `contracts/` avec schémas Zod (santé, calcul scientifique, Mercuria).
   - [x] Moteur de calcul C++ dans `native/` validé sous AddressSanitizer (0 fuite) & banc Mercuria (716 Mops/s).
-- [ ] **Étape 4 : Orchestration Fullstack & Interface Scientifique**
-  - [ ] Liaison `server/` (bridge natif vers Node.js / TypeScript).
-  - [ ] Application `web/` (React + TypeScript + visualisations).
+- [x] **Étape 4 : Orchestration Fullstack & Interface Scientifique**
+  - [x] Liaison `server/` (bridge natif vers Node.js / TypeScript avec tests d'intégration).
+  - [x] Application `web/` (React 19 + TypeScript + tableau de bord scientifique temps réel).
+- [ ] **Étape 5 : Ingénierie de Langages (Projet Onyx & LLVM)**
+  - [ ] Définition de la grammaire et du lexer / parser Onyx.
+  - [ ] Génération de code intermédiaire LLVM IR.
+  - [ ] Bancs de mesure Mercuria comparatifs (Onyx vs C++ vs Rust).

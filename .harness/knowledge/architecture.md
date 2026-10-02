@@ -66,3 +66,8 @@ flowchart LR
 ### ADR-003 : Tolérance zéro aux régressions mémoire et de performance
 - **Contexte :** Les applications scientifiques et les langages de programmation ne peuvent tolérer de fuites ou de ralentissements silencieux.
 - **Décision :** Chaque commit exécutera `scripts/verify.sh` sous AddressSanitizer et mesurera la stabilité des benchmarks clés.
+
+### ADR-004 : Surcouche MCP Composite pour Projets Denses
+- **Contexte :** Dans les projets complexes (moteur de calcul, compilateurs), l'exécution de commandes terminal brutes pollue le contexte de l'agent et augmente le taux d'erreur.
+- **Décision :** Utiliser le SDK officiel MCP (`@modelcontextprotocol/sdk`) dans `.forge/mcp/` pour fournir des macro-outils composites qui encapsulent l'analyse mémoire (ASan/Valgrind), le profilage comparatif (Mercuria) et la navigation syntaxique (Onyx AST).
+

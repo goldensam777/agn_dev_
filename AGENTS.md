@@ -41,9 +41,12 @@ agn_dev_/
 ├── AGENTS.md                 # Mémoire persistante du projet et guide pour les agents (ce fichier)
 ├── CONVENTIONS.md            # Règles absolues de style, commandes de test, invariants
 ├── package.json              # Monorepo / Workspaces (web, server, contracts)
-├── .forge/                   # Infrastructure de sandbox
+├── .forge/                   # Infrastructure de sandbox & outils agents
 │   ├── Dockerfile            # Environnement complet isolé (compilateurs, ASan, Valgrind, LLVM)
-│   └── docker-compose.yml    # Configuration d'exécution sécurisée
+│   ├── docker-compose.yml    # Configuration d'exécution sécurisée
+│   └── mcp/                  # Surcouche MCP personnalisée (outils composites pour projets denses)
+│       ├── package.json      # SDK officiel @modelcontextprotocol/sdk
+│       └── src/              # Outils chirurgicaux (audit mémoire, benchmarks Mercuria, AST Onyx)
 ├── .harness/                 # Base de connaissances et modes opératoires pour l'agent
 │   ├── knowledge/            # CE QU'IL DOIT SAVOIR
 │   │   ├── architecture.md   # Carte du projet et décisions prises (ADR)

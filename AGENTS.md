@@ -120,6 +120,10 @@ agn_dev_/
   - [x] Bibliothèque de références `docs/references/` (*Dragon Book* 2e éd., *Crafting Interpreters*).
   - [x] Outil d'interrogation chirurgicale rapide `scripts/query_book.py`.
   - [x] 8 synthèses algorithmiques fondamentales dans `.harness/knowledge/domain/compilers/` (Automates, Pratt/LR, SDD/AST, SSA/Dominance, Run-time/GC, CFG/Tree tiling, Dataflow equations, Chaitin-Briggs).
+- [x] **Étape 4.9 : Exemples Canoniques & Connaissances Transverses de Production**
+  - [x] 9 exemples canoniques complets dans `.harness/examples/` (C++ Pratt & Kahan, Rust Pratt, C23 Arena, TS Branded, React 19 WebGL Canvas, JS Worker Pipeline, Python Vectorized NumPy).
+  - [x] Corpus transverse dans `.harness/knowledge/domain/fullstack/` (mesure, KPIs, Web Vitals, p99, architecture stateless, observabilité RED/USE, conteneurs durcis).
+  - [x] Corpus transverse dans `.harness/knowledge/domain/scientific/` (reproductibilité déterministe, sécurité frontière NaN/Inf, tolérances, orchestration asynchrone).
 - [ ] **Étape 5 : Ingénierie de Langages (Compilateurs, Interpréteurs & LLVM)**
   - [ ] Architecture type pour grammaire, lexer et parser.
   - [ ] Génération de code intermédiaire LLVM IR.

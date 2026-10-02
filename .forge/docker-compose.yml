@@ -1,0 +1,20 @@
+services:
+  sandbox:
+    build:
+      context: ..
+      dockerfile: .forge/Dockerfile
+    image: forge-sandbox:latest
+    container_name: forge_agent_sandbox
+    working_dir: /workspace
+    volumes:
+      - ..:/workspace:rw
+    # Limites strictes pour empêcher tout blocage ou dérive de la machine hôte
+    deploy:
+      resources:
+        limits:
+          cpus: "4.0"
+          memory: 4096M
+        reservations:
+          memory: 1024M
+    stdin_open: true
+    tty: true

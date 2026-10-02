@@ -1,0 +1,23 @@
+{
+  "name": "@forge/mcp-server",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Serveur MCP composite pour l'environnement agentique Forge",
+  "main": "dist/index.js",
+  "bin": {
+    "forge-mcp": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.6.1",
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.8.0"
+  }
+}

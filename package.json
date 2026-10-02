@@ -1,0 +1,24 @@
+{
+  "name": "agn-forge",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Forge logicielle autonome et environnement agentique de haute précision",
+  "workspaces": [
+    "contracts",
+    "server",
+    "web",
+    ".forge/mcp"
+  ],
+  "scripts": {
+    "verify": "bash scripts/verify.sh",
+    "build": "npm run --workspaces --if-present build",
+    "test": "npm run --workspaces --if-present test",
+    "typecheck": "npm run --workspaces --if-present typecheck"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

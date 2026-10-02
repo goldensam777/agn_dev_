@@ -1,0 +1,28 @@
+# Node & Web
+node_modules/
+dist/
+.turbo/
+coverage/
+
+# C / C++ & Native
+build/
+bin/
+*.o
+*.a
+*.so
+*.dylib
+*.out
+
+# Rust
+target/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# IDE & OS
+.vscode/
+.idea/
+.DS_Store
+*.log

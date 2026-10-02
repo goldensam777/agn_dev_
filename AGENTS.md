@@ -25,10 +25,10 @@ L'objectif de cet environnement n'est pas de produire des prototypes jetables, m
    - Cœur de calcul numérique haute performance en C++ / Rust.
    - Pont de communication typé et orchestrateur Node.js / TypeScript.
    - Interface frontend React / TypeScript avec rendu visuel haute fidélité (WebGL / WebGPU).
-3. **Palier 3 : Ingénierie de Langages de Programmation (Le sommet)**
-   - Conception et implémentation de nouveaux langages de programmation (notamment le projet **Onyx**).
+3. **Palier 3 : Ingénierie de Langages de Programmation (Compilateurs & Runtimes)**
+   - Conception et implémentation de nouveaux langages de programmation (compilateurs, interpréteurs, DSL).
    - Génération de code optimisé via l'infrastructure **LLVM**.
-   - Bancs de mesure et comparatifs de performance extrêmes (le rôle de **Mercuria**).
+   - Bancs de mesure et comparatifs de performance extrêmes (profilage CPU/mémoire/cache L1/L2).
 
 ---
 
@@ -46,11 +46,11 @@ agn_dev_/
 │   ├── docker-compose.yml    # Configuration d'exécution sécurisée
 │   └── mcp/                  # Surcouche MCP personnalisée (outils composites pour projets denses)
 │       ├── package.json      # SDK officiel @modelcontextprotocol/sdk
-│       └── src/              # Outils chirurgicaux (audit mémoire, benchmarks Mercuria, AST Onyx)
+│       └── src/              # Outils chirurgicaux (audit mémoire, profilage, analyseurs AST)
 ├── .harness/                 # Base de connaissances et modes opératoires pour l'agent
 │   ├── knowledge/            # CE QU'IL DOIT SAVOIR
 │   │   ├── architecture.md   # Carte du projet et décisions prises (ADR)
-│   │   ├── domain/           # Savoir scientifique, spécifications d'Onyx...
+│   │   ├── domain/           # Savoir scientifique, spécifications de langages / algorithmes
 │   │   └── glossary.md       # Vocabulaire et définitions du projet
 │   ├── playbooks/            # COMMENT RÉALISER UNE TÂCHE
 │   │   ├── add-endpoint.md   # Procédure pas-à-pas pour une nouvelle route
@@ -78,7 +78,7 @@ agn_dev_/
 │   ├── include/
 │   ├── src/
 │   ├── tests/                # Tests unitaires (GoogleTest / Catch2 / cargo test)
-│   └── bench/                # Bancs de mesure de performance (Mercuria)
+│   └── bench/                # Bancs de mesure de performance et profilage
 └── .github/workflows/        # Intégration continue miroir de scripts/verify.sh
 ```
 
@@ -105,12 +105,12 @@ agn_dev_/
   - [x] Sandbox `.forge/Dockerfile` & `docker-compose.yml`.
   - [x] Surcouche MCP composite pour projets denses (`.forge/mcp/`).
 - [x] **Étape 3 : Frontière `contracts/` & Premier Module `native/`**
-  - [x] Initialisation de `contracts/` avec schémas Zod (santé, calcul scientifique, Mercuria).
-  - [x] Moteur de calcul C++ dans `native/` validé sous AddressSanitizer (0 fuite) & banc Mercuria (716 Mops/s).
+  - [x] Initialisation de `contracts/` avec schémas Zod (santé, calcul scientifique, benchmarks).
+  - [x] Moteur de calcul C++ dans `native/` validé sous AddressSanitizer (0 fuite) & banc de mesure (716 Mops/s).
 - [x] **Étape 4 : Orchestration Fullstack & Interface Scientifique**
   - [x] Liaison `server/` (bridge natif vers Node.js / TypeScript avec tests d'intégration).
   - [x] Application `web/` (React 19 + TypeScript + tableau de bord scientifique temps réel).
-- [ ] **Étape 5 : Ingénierie de Langages (Projet Onyx & LLVM)**
-  - [ ] Définition de la grammaire et du lexer / parser Onyx.
+- [ ] **Étape 5 : Ingénierie de Langages (Compilateurs, Interpréteurs & LLVM)**
+  - [ ] Architecture type pour grammaire, lexer et parser.
   - [ ] Génération de code intermédiaire LLVM IR.
-  - [ ] Bancs de mesure Mercuria comparatifs (Onyx vs C++ vs Rust).
+  - [ ] Bancs de mesure comparatifs multi-langages.

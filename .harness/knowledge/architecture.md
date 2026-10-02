@@ -27,8 +27,8 @@ flowchart LR
 
     subgraph ENGINE["native/ (C++ / Rust)"]
         Core["Moteur de calcul / SIMD"]
-        Sanitizers["Tests & Benchmarks (Mercuria)"]
-        Compiler["Frontend Compilateur (Onyx / LLVM)"]
+        Sanitizers["Tests & Bancs de mesure"]
+        Compiler["Compilateur & Frontend LLVM"]
     end
 
     Components --> ApiClient
@@ -69,5 +69,5 @@ flowchart LR
 
 ### ADR-004 : Surcouche MCP Composite pour Projets Denses
 - **Contexte :** Dans les projets complexes (moteur de calcul, compilateurs), l'exécution de commandes terminal brutes pollue le contexte de l'agent et augmente le taux d'erreur.
-- **Décision :** Utiliser le SDK officiel MCP (`@modelcontextprotocol/sdk`) dans `.forge/mcp/` pour fournir des macro-outils composites qui encapsulent l'analyse mémoire (ASan/Valgrind), le profilage comparatif (Mercuria) et la navigation syntaxique (Onyx AST).
+- **Décision :** Utiliser le SDK officiel MCP (`@modelcontextprotocol/sdk`) dans `.forge/mcp/` pour fournir des macro-outils composites qui encapsulent l'analyse mémoire (ASan/Valgrind), le profilage comparatif haute précision et l'inspection syntaxique (AST de compilateur).
 

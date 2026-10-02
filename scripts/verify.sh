@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# scripts/verify.sh — Le Juge Souverain de la Forge
-# Règle d'or : Ce script doit renvoyer 0 pour que toute tâche soit déclarée accomplie.
+# scripts/verify.sh
+# Ce script doit renvoyer 0 pour que toute tâche soit déclarée accomplie.
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -14,7 +14,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
 echo -e "${BLUE}====================================================${NC}"
-echo -e "${BLUE}          FORGE AGENTIQUE — CONTRÔLE DE QUALITÉ     ${NC}"
+echo -e "${BLUE}          AGN DEV — VERIFIER                        ${NC}"
 echo -e "${BLUE}====================================================${NC}"
 
 FAILURES=0

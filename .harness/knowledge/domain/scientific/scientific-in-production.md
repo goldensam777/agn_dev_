@@ -1,65 +1,106 @@
-# Domaine Scientifique : Calcul Numérique en Production
+# Le Calcul Scientifique en Production
 
-> Rigueur numérique, reproductibilité déterministe, sécurité aux frontières d'interfaces, orchestration des calculs lourds et monitoring du drift scientifique.
-
----
-
-## 1. Reproductibilité & Traçabilité de Provenance
-
-Un calcul scientifique en production doit pouvoir être rejoué à l'identique plusieurs mois plus tard, sur une autre machine :
-
-### A. Gestion Déterministe des Graines Aléatoires (Seeds) :
-- Ne jamais appeler `np.random.seed()` globalement (effet de bord inter-modules imprévisible).
-- Toujours instancier un générateur explicite isolé :
-  ```python
-  rng = np.random.default_rng(seed=42)
-  samples = rng.standard_normal(size=10_000)
-  ```
-
-### B. Empreinte de Provenance (Provenance Tracking) :
-Chaque résultat de calcul doit être scellé avec un manifeste incluant :
-- Le hash SHA-256 des données d'entrée.
-- La version exacte de l'algorithme et du commit Git.
-- Les drapeaux de compilation du moteur natif (`-O3`, `-march=native`, options d'arrondi FMA).
-- L'architecture matérielle (ex: x86_64 AVX-512 vs ARM64 NEON).
-- Le `resultChecksum` de validation croisée (déjà encodé dans nos contrats `contracts/schemas.ts`).
+> Règles pour servir du calcul scientifique via une plateforme fullstack :
+> orchestration de jobs, reproductibilité, sécurité numérique aux frontières,
+> monitoring. À croiser avec `fullstack/platform-production.md` (files,
+> backpressure, observabilité y sont traités en général ; ici, en version
+> scientifique).
 
 ---
 
-## 2. Sécurité Numérique aux Frontières (Zéro NaN / Zéro Inf)
+## 1. Déterminisme & reproductibilité : la promesse minimale
 
-Les valeurs non numériques (`NaN`) et infinies (`±Inf`) ont la propriété délétère de contaminer silencieusement l'ensemble des matrices lors des multiplications en cascade.
+Un résultat scientifique doit être **reproductible** : même entrée → même sortie,
+partout, dans 6 mois.
 
-### Règle d'or aux frontières d'API :
-1. **Validation en Entrée :** Les validateurs Zod dans `contracts/schemas.ts` et les assertions C++/Rust doivent rejeter immédiatement toute valeur non finie (`std::isfinite(val)` ou `z.number().finite()`).
-2. **Validation en Sortie :** Aucun moteur natif ne doit renvoyer de payload contenant un `NaN` non détecté. En cas d'instabilité, lever une exception typée `ConvergenceError` plutôt que de polluer les pipelines d'affichage.
+- **Seed explicite, toujours.** `np.random.default_rng(seed)`, `std::mt19937(seed)`,
+  et le seed transite dans le contrat ou est journalisé avec le job.
+  (`canonical_vectorized_numpy.py` le montre.)
+- **Environnement figé par le job :** image Docker (digest), versions des libs,
+  paramètres, seed, checksum du dataset → enregistrés AVEC le résultat.
+  Sans ce paquet de provenance, un résultat n'est pas une donnée, c'est une rumeur.
+- **Pas d'horloge, pas d'ordre de dictionnaire, pas de parallélisme non
+  déterministe** dans le chemin qui produit le résultat. Si le parallélisme
+  change l'ordre des sommations, le non-déterminisme doit être assumé et borné
+  (voir §2).
 
-### Assertions Flottantes Tolérantes aux Arrondis :
-Ne jamais tester l'égalité stricte `a == b` sur des nombres à virgule flottante :
-$$\text{Tolérance} : |a - b| \le \text{atol} + \text{rtol} \times |b|$$
-Utiliser systématiquement `np.testing.assert_allclose(actual, desired, rtol=1e-7, atol=1e-9)` en Python, ou `std::abs(a - b) <= (atol + rtol * std::abs(b))` en C++.
+## 2. Sécurité numérique aux frontières (là où la confiance s'arrête)
 
----
+1. **Valider les entrées au contrat (Zod) — y compris contre NaN/Inf.** Ajouter
+   `.refine(Number.isFinite)` sur tout flottant qui alimente le moteur. Un NaN
+   en entrée ne doit jamais devenir un NaN en résultat présenté comme valide.
+2. **Rejeter NaN/Inf en SORTIE du moteur natif** avant de répondre à l'utilisateur :
+   le binaire C++ doit échouer explicitement plutôt que d'émettre un indéterminé.
+3. **Comparaisons avec tolérance, jamais `==`.** Tolérance RELATIVE adossée à
+   une référence de précision supérieure (cf. `canonical_kahan_summation.cpp`).
+4. **Budget de précision écrit par domaine.** Exemple : « sommes agrégées en
+   double compensé (Neumaire) ; matrices ≤ 1e-12 de conditionnement, sinon
+   avertissement explicite dans la réponse ». Un budget non écrit = précision
+   aléatoire.
+5. **Tests de convergence :** pour toute méthode itérative, les golden tests
+   vérifient la convergence (résidu décroissant, ordre théorique), pas seulement
+   la valeur finale.
 
-## 3. Orchestration des Jobs de Calcul Lourd
+## 3. Orchestration des jobs de calcul
 
-1. **Découplage Temporel (Asynchronisme) :**
-   - Une requête HTTP ne doit jamais bloquer pendant l'exécution d'un calcul numérique de plus de 200 ms.
-   - Modèle asynchrone exigé :
-     $$\text{Client} \xrightarrow{\text{POST /compute}} \text{Job Enregistré (HTTP 202 + JobId)} \to \text{File de Tâches} \to \text{Worker Pool C++/Rust}$$
-     Le client consulte la progression via polling SSE ou WebSockets.
-2. **Idempotence & Déduplication :**
-   - L'identifiant de job (`jobId`) est calculé comme le hash cryptographique des paramètres d'entrée.
-   - Si deux requêtes identiques arrivent simultanément, le worker mutualise le calcul et retourne le même résultat sans recalcul inutile.
-3. **Quotas Mémoire & Isolation Processus :**
-   - L'exécution du moteur natif est confinée avec des limites d'adresses virtuelles (`RLIMIT_AS`) ou sous cgroups pour éviter qu'une instabilité mémoire n'abatte l'orchestrateur Node.js.
+La règle d'architecture (cf. platform-production.md §3) devient **absolue** en
+scientifique : le calcul ne vit JAMAIS dans la requête HTTP.
 
----
+```
+POST /compute ──► validation Zod ──► file de jobs ──► worker pool ──► binaire natif
+                        │                                   │            (timeout,
+                        ▼                                   ▼             quota mémoire)
+                 202 + jobId (immédiat)              résultat + checksum ──► store
+```
 
-## 4. Surveillance du « Drift » Scientifique
+- **Idempotence par `jobId` :** rejouer un job produit le même enregistrement,
+  pas un doublon. (Le schéma `jobId: z.string().uuid()` est déjà la bonne fondation.)
+- **Déduplication par empreinte :** même algorithme + mêmes paramètres + même
+  checksum d'entrée → servir le résultat caché. C'est le rôle exact du champ
+  `resultChecksum` de `ComputeJobResponseSchema` : il adresse le résultat.
+- **Timeouts, annulation, quotas :** chaque job a un timeout dur et une limite
+  mémoire (le moteur mesure déjà `peakMemoryBytes` — en faire un quota : un job
+  qui dépasse est tué et marqué `failed`, jamais laissé fuir).
+- **Retries bornés et déterministes :** en scientifique, un retry est sûr SI le
+  job est déterministe (seed fixe) — le dire dans la spec du worker.
+- **Backpressure à la soumission :** file pleine → 429 + `Retry-After`, pas une
+  file infinie en mémoire.
+- **Priorités :** files distinctes (interactif vs batch) pour qu'un batch de
+  10 000 jobs ne fasse pas attendre une requête utilisateur.
 
-En environnement de production, les distributions de données réelles dérivent (*data drift*) et peuvent pousser les algorithmes vers des zones de conditionnement instable :
+## 4. Données scientifiques
 
-- **Conditionnement Matriciel :** Surveiller périodiquement le nombre de condition $\kappa(A) = \|A\| \cdot \|A^{-1}\|$. Si $\kappa(A) > 10^{12}$ en simple ou double précision, déclencher une alerte d'instabilité numérique imminente.
-- **Norme des Résidus :** Consigner la norme du résidu $\|Ax - b\|$ à chaque pas de résolution linéaire pour détecter une perte de convergence.
-- **Monitoring Temporel :** Tracer l'évolution des distributions statistiques (moyenne, écart-type, percentiles 1% et 99%) pour détecter les dérives de capteurs ou de flux d'entrée.
+- **Validation aux frontières, en amont du calcul :** schémas Zod sur tout ce
+  qui entre (`contracts/` — déjà la règle d'or du dépôt).
+- **Unités dans les types :** un `length_m` n'est pas un `length_mm` (cf.
+  branded types, `ts/core/branded-types.md`). En scientifique, une erreur
+  d'unité est un incident de production, pas un détail.
+- **Versionnage et provenance des datasets :** dataset = contenu adressé
+  (checksum) + schéma versionné. Jamais de « le fichier sur le disque du serveur ».
+- **Traçabilité du résultat :** qui, quand, quelle version, quels paramètres,
+  quelle empreinte d'entrée. Un résultat sans provenance ne se débogue pas et
+  ne se publie pas.
+
+## 5. Monitoring scientifique (au-delà des métriques techniques)
+
+- **Les métriques métier sont scientifiques :** précision atteinte, itérations
+  de convergence, taux d'échec numérique (NaN/Inf détectés), distribution des
+  erreurs vs référence.
+- **Le drift se surveille :** si la qualité numérique se dégrade dans le temps
+  (mêmes entrées, erreur croissante), c'est un incident au même titre qu'une 500 —
+  dépendance mise à jour, compilation différente, donnée corrompue en amont.
+- **Le moteur natif est un citoyen observable :** santé (`bridge.isHealthy()`),
+  latence par algorithme, débit — dans les métriques RED de la plateforme, pas
+  dans un coin du serveur.
+
+## Checklist « feature scientifique en prod »
+
+- [ ] Seed + versions + paramètres + checksum d'entrée journalisés avec le résultat
+- [ ] NaN/Inf rejetés à l'entrée (contrat) ET à la sortie (moteur)
+- [ ] Comparaisons par tolérance adossée à une référence de précision supérieure
+- [ ] Budget de précision écrit pour le domaine
+- [ ] Job idempotent (jobId) + déduplication par empreinte
+- [ ] Timeout dur + quota mémoire par job
+- [ ] Backpressure à la soumission (429 + Retry-After)
+- [ ] Golden tests de convergence (pas seulement de valeur finale)
+- [ ] `bash scripts/verify.sh` : exit 0

@@ -1,19 +1,29 @@
-# Domaine Scientifique : Calcul & Algorithmes en Production
+# Domaine Transverse : Scientifique en Production
 
-> Base de connaissances transverse pour la rigueur numérique, la reproductibilité déterministe et l'exploitation des calculs scientifiques lourds en production.
+> À charger pour toute tâche qui met du calcul scientifique entre les mains
+> d'utilisateurs réels : pipelines de jobs, résultats numériques servis par API,
+> reproductibilité, monitoring scientifique. Complète les corpus langages
+> (cpp/domains/scientific.md, python/domains/scientific-numpy.md…) : ceux-ci
+> disent comment écrire le calcul ; ce document dit comment le FAIRE TOURNER.
 
----
+## Structure
 
-## 1. Organisation du Domaine
+```
+scientific/
+├── README.md                    ← ce fichier
+└── scientific-in-production.md  ← jobs, reproductibilité, sécurité numérique en prod
+```
 
-| Fichier | Sujet Traité |
+## Règles de chargement
+
+| Situation | Charger |
 |---|---|
-| [`scientific-in-production.md`](scientific-in-production.md) | Reproductibilité absolue, traçabilité de provenance, sécurité numérique aux frontières (NaN/Inf), tolérances relatives et absolues, orchestration des jobs lourds et monitoring du drift scientifique. |
+| Implémenter un algorithme / optimiser du calcul | corpus langage (`domains/scientific*`) |
+| Servir du calcul via l'API, orchestrer des jobs, garantir la reproductibilité | `scientific-in-production.md` |
+| Review d'un résultat numérique exposé aux utilisateurs | `scientific-in-production.md` + `quality/` du langage |
 
----
+## Principe fondateur
 
-## 2. La Règle d'Or du Calcul Scientifique de la Forge
-
-> **« Un résultat presque correct est une réponse fausse avec de bonnes manières. »**
-> 
-> En calcul scientifique et en ingénierie, une approximation instable ou un arrondi cumulatif non maîtrisé invalide l'ensemble de la chaîne décisionnelle. Tout calcul produit doit être accompagné de son intervalle de confiance, de sa tolérance d'erreur mesurée et de son empreinte cryptographique de reproductibilité.
+En scientifique, la qualité a une définition plus dure qu'ailleurs : **un résultat
+presque correct est une réponse fausse avec de bonnes manières.** Un crash se voit ;
+un résultat numériquement faux, non. Toute la discipline vient de là.

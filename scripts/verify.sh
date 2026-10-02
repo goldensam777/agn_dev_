@@ -76,6 +76,7 @@ REQUIRED_FILES=(
     "web/src/components/StatusBadge.tsx"
     ".forge/mcp/src/index.ts"
     ".harness/knowledge/languages/cpp/README.md"
+    ".harness/knowledge/languages/rust/README.md"
     ".harness/playbooks/init-language-corpus.md"
 )
 

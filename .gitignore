@@ -27,3 +27,6 @@ __pycache__/
 .DS_Store
 # References & Large Binaries
 docs/references/*.pdf
+
+#other
+story.txt

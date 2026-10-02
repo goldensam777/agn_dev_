@@ -8,21 +8,30 @@ import { exec } from "node:child_process";
 import { promisify } from "node:util";
 import fs from "node:fs/promises";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 const execAsync = promisify(exec);
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Chemin racine du Hub de la Forge
+const FORGE_HUB_DIR = process.env.FORGE_HUB_DIR || path.resolve(__dirname, "../../..");
+
 const EXEC_OPTIONS = {
-  timeout: 60_000, // 60 secondes maximum
-  maxBuffer: 10 * 1024 * 1024, // 10 Mo de buffer pour les traces complètes
+  timeout: 60_000,
+  maxBuffer: 10 * 1024 * 1024,
 };
 
 /**
- * Serveur MCP Forge — Surcouche d'outils de haute précision pour agents de laboratoire
+ * Serveur MCP Hub Global de la Forge
+ * Expose la base de connaissances experte, l'outillage de test haute précision
+ * et le générateur de harnais pour tous les projets extérieurs.
  */
 const server = new Server(
   {
-    name: "forge-agent-tools",
-    version: "0.2.0",
+    name: "forge-global-hub",
+    version: "1.0.0",
   },
   {
     capabilities: {
@@ -31,35 +40,76 @@ const server = new Server(
   }
 );
 
-// Outils chirurgicaux exposés à l'agent
 const TOOLS = [
   {
-    name: "forge_verify",
-    description: "Exécute le juge scripts/verify.sh. Vérifie la compilation, l'absence de fuites mémoire (ASan), les types Zod et les tests. Le code de retour 0 est la seule preuve de succès.",
+    name: "forge_query_knowledge",
+    description: "Interroge la base de connaissances experte de la Forge (7 corpus de langages, Dragon Book, architecture scientifique, fullstack). Utile depuis n'importe quel projet extérieur pour consulter les règles canoniques, algorithmes et modèles théoriques.",
     inputSchema: {
       type: "object",
       properties: {
-        verbose: { type: "boolean", description: "Afficher tous les détails de sortie" },
+        query: { type: "string", description: "Terme ou concept à rechercher (ex: 'Pratt', 'SSA', 'Arena C23', 'Rust unsafe', 'Kahan', 'Web Vitals')" },
+        category: {
+          type: "string",
+          enum: ["all", "languages", "compilers", "dragon_book", "scientific", "fullstack"],
+          description: "Catégorie de recherche optionnelle",
+        },
       },
+      required: ["query"],
+    },
+  },
+  {
+    name: "forge_get_canonical_example",
+    description: "Récupère un exemple canonique de référence validé sous ASan/tests (C++ Pratt/Arena, Rust Pratt, C23 Arena, TS Branded, React WebGL, Python NumPy, etc.) ou liste les exemples disponibles.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        exampleName: {
+          type: "string",
+          description: "Nom du fichier d'exemple (ex: 'canonical_pratt_parser_arena.cpp', 'canonical_arena_c23.c', 'canonical_lexer_pratt.rs') ou 'list' pour tout afficher.",
+        },
+      },
+      required: ["exampleName"],
+    },
+  },
+  {
+    name: "forge_scaffold_harness",
+    description: "Initialise instantanément l'enveloppe de gouvernance agentique (AGENTS.md, CONVENTIONS.md, scripts/verify.sh, .harness/) dans un projet extérieur.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        targetDir: { type: "string", description: "Chemin absolu ou relatif du répertoire du projet extérieur à initialiser" },
+        projectType: {
+          type: "string",
+          enum: ["rust", "cpp", "c", "typescript", "python", "polyglot"],
+          description: "Stack technologique principale du projet",
+        },
+        projectName: { type: "string", description: "Nom du projet extérieur" },
+      },
+      required: ["targetDir", "projectType"],
     },
   },
   {
     name: "forge_audit_memory",
-    description: "Compile et exécute un fichier source C++ isolé sous AddressSanitizer (ASan). Vérifie l'absence de fuite et de dépassement de tampon dans un binaire temporaire sécurisé avec timeout.",
+    description: "Compile et exécute un fichier source C ou C++ sous AddressSanitizer et UndefinedBehaviorSanitizer dans un bac à sable temporaire sécurisé avec rapport de fuites mémoire.",
     inputSchema: {
       type: "object",
       properties: {
-        sourcePath: { type: "string", description: "Chemin du fichier source C++ à analyser" },
+        sourcePath: { type: "string", description: "Chemin du fichier source C/C++ à auditer" },
+        standard: { type: "string", description: "Standard du compilateur (ex: 'c++20', 'c++23', 'c23', 'c17'), défaut 'c++20'" },
+        isC: { type: "boolean", description: "Vrai si c'est du C pur (clang), faux si C++ (clang++)" },
       },
       required: ["sourcePath"],
     },
   },
   {
-    name: "forge_run_benchmarks",
-    description: "Compile et exécute réellement le banc de mesure natif (make bench). Retourne les métriques réelles de débit (opérations/seconde) et de latence.",
+    name: "forge_verify",
+    description: "Exécute le juge scripts/verify.sh dans le projet cible (ou le répertoire courant). Le code de retour 0 est la seule preuve formelle d'achèvement d'une tâche.",
     inputSchema: {
       type: "object",
-      properties: {},
+      properties: {
+        projectDir: { type: "string", description: "Répertoire racine du projet à vérifier (défaut: dossier courant)" },
+        verbose: { type: "boolean", description: "Afficher l'intégralité des sorties de tests" },
+      },
     },
   },
 ];
@@ -72,42 +122,205 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: args } = request.params;
 
   try {
-    if (name === "forge_verify") {
+    // 1. Interrogation de la base de connaissances du Hub
+    if (name === "forge_query_knowledge") {
+      const query = String(args?.["query"] ?? "").trim();
+      const category = String(args?.["category"] ?? "all");
+
+      if (!query) throw new Error("Le paramètre 'query' est requis.");
+
+      const results: string[] = [];
+
+      // A. Recherche dans le Dragon Book via query_book.py si pertinent
+      if (category === "compilers" || category === "dragon_book" || category === "all") {
+        try {
+          const scriptPath = path.join(FORGE_HUB_DIR, "scripts/query_book.py");
+          const { stdout } = await execAsync(`python3 "${scriptPath}" --book dragon --search "${query}"`, {
+            cwd: FORGE_HUB_DIR,
+            timeout: 20_000,
+          });
+          if (stdout && stdout.trim().length > 0) {
+            results.push(`### Extraits du Dragon Book (Compilateurs & Optimisations) :\n${stdout.slice(0, 3000)}`);
+          }
+        } catch {
+          // Si pdftotext n'est pas dispo ou aucun résultat, on continue silencieusement
+        }
+      }
+
+      // B. Recherche textuelle dans les fichiers markdown de .harness/knowledge
+      const knowledgeDir = path.join(FORGE_HUB_DIR, ".harness/knowledge");
       try {
-        const { stdout, stderr } = await execAsync("bash scripts/verify.sh", {
-          ...EXEC_OPTIONS,
-          timeout: 120_000,
-        });
+        const grepCmd = `grep -rnI -i --max-count=3 "${query}" "${knowledgeDir}" | head -n 30`;
+        const { stdout } = await execAsync(grepCmd, { timeout: 10_000 });
+        if (stdout && stdout.trim().length > 0) {
+          results.push(`### Fichiers de Connaissances du Hub correspondants :\n${stdout}`);
+        }
+      } catch {
+        // grep renvoie code 1 si aucun match trouvé
+      }
+
+      const responseText = results.length > 0
+        ? results.join("\n\n---\n\n")
+        : `Aucune correspondance trouvée pour '${query}' dans la base de connaissances du Hub (${FORGE_HUB_DIR}).`;
+
+      return {
+        content: [{ type: "text", text: responseText }],
+      };
+    }
+
+    // 2. Consultation des exemples canoniques
+    if (name === "forge_get_canonical_example") {
+      const exampleName = String(args?.["exampleName"] ?? "list").trim();
+      const examplesDir = path.join(FORGE_HUB_DIR, ".harness/examples");
+
+      if (exampleName === "list") {
+        const files = await fs.readdir(examplesDir);
+        const listText = files
+          .filter((f) => !f.startsWith("."))
+          .map((f) => `- ${f}`)
+          .join("\n");
         return {
           content: [
             {
               type: "text",
-              text: `=== VERDICT FORGE: PASS ===\n${stdout}\n${stderr}`,
-            },
-          ],
-        };
-      } catch (err: any) {
-        return {
-          isError: true,
-          content: [
-            {
-              type: "text",
-              text: `=== VERDICT FORGE: FAIL (Code de retour ${err.code ?? 1}) ===\n${err.stdout ?? ""}\n${err.stderr ?? ""}\nErreur: ${err.message}`,
+              text: `=== EXEMPLES CANONIQUES DE LA FORGE (${examplesDir}) ===\n${listText}\n\nSpécifiez le nom d'un fichier pour afficher son contenu intégral.`,
             },
           ],
         };
       }
+
+      const filePath = path.join(examplesDir, path.basename(exampleName));
+      const content = await fs.readFile(filePath, "utf-8");
+      return {
+        content: [
+          {
+            type: "text",
+            text: `=== EXEMPLE CANONIQUE: ${exampleName} ===\n\`\`\`\n${content}\n\`\`\``,
+          },
+        ],
+      };
     }
 
+    // 3. Scaffolding d'un projet extérieur
+    if (name === "forge_scaffold_harness") {
+      const targetDir = path.resolve(process.cwd(), String(args?.["targetDir"] ?? "."));
+      const projectType = String(args?.["projectType"] ?? "polyglot");
+      const projectName = String(args?.["projectName"] ?? path.basename(targetDir));
+
+      await fs.mkdir(path.join(targetDir, "scripts"), { recursive: true });
+      await fs.mkdir(path.join(targetDir, ".harness/knowledge/domain"), { recursive: true });
+      await fs.mkdir(path.join(targetDir, ".harness/playbooks"), { recursive: true });
+
+      // A. AGENTS.md
+      const agentsMd = `# AGENTS.md — Mémoire & Guide de Continuité pour ${projectName}
+
+Ce dépôt est gouverné par les principes de la **Forge Agentique**. Tout agent intervenant sur ce projet doit impérativement respecter les règles suivantes :
+
+1. **Le Juge Souverain (\`scripts/verify.sh\`) :** Une tâche n'est JAMAIS achevée sans un code de retour 0.
+2. **Journal des Décisions :** Toute décision d'architecture doit être notée dans \`.harness/knowledge/decisions.md\`.
+3. **Hub Central de Connaissances :** Vous avez accès au Hub de connaissances expert (\`${FORGE_HUB_DIR}\`) via les outils MCP de la Forge (\`forge_query_knowledge\`, \`forge_get_canonical_example\`).
+`;
+      await fs.writeFile(path.join(targetDir, "AGENTS.md"), agentsMd, "utf-8");
+
+      // B. CONVENTIONS.md
+      let conventionsBody = "";
+      if (projectType === "rust") {
+        conventionsBody = `## Invariants Rust
+- \`cargo clippy --all-targets -- -D warnings\` doit passer avec zéro warning.
+- \`cargo test\` doit être à 100% vert.
+- Tout bloc \`unsafe\` doit comporter un commentaire \`// SAFETY:\` détaillant les invariants.`;
+      } else if (projectType === "cpp" || projectType === "c") {
+        conventionsBody = `## Invariants C / C++
+- Compilation stricte : \`-Wall -Wextra -Wpedantic -Werror\`.
+- AddressSanitizer obligatoire : \`-fsanitize=address,undefined\`.
+- Zéro fuite mémoire tolérée à l'exécution.`;
+      } else if (projectType === "typescript") {
+        conventionsBody = `## Invariants TypeScript
+- \`strict: true\` dans tsconfig.
+- Frontières d'API validées par des schémas de contrat (Zod).
+- Zéro \`any\` non justifié.`;
+      } else if (projectType === "python") {
+        conventionsBody = `## Invariants Python
+- Typage statique strict avec \`mypy\` ou \`pyright\`.
+- Formatage et linting via \`ruff check\`.
+- Tests unitaires complets via \`pytest\`.`;
+      } else {
+        conventionsBody = `## Invariants Polyglot
+- Tests unitaires et linters stricts.
+- Pas de warnings de compilation tolérés.`;
+      }
+
+      const conventionsMd = `# CONVENTIONS.md — Règles et Commandes pour ${projectName}
+
+${conventionsBody}
+
+## Commande souveraine de vérification
+\`\`\`bash
+bash scripts/verify.sh
+\`\`\`
+`;
+      await fs.writeFile(path.join(targetDir, "CONVENTIONS.md"), conventionsMd, "utf-8");
+
+      // C. scripts/verify.sh
+      let verifyScriptCommands = "";
+      if (projectType === "rust") {
+        verifyScriptCommands = `cargo clippy --all-targets -- -D warnings\ncargo test`;
+      } else if (projectType === "typescript") {
+        verifyScriptCommands = `npm run typecheck 2>/dev/null || npx tsc --noEmit\nnpm test`;
+      } else if (projectType === "python") {
+        verifyScriptCommands = `pytest`;
+      } else {
+        verifyScriptCommands = `echo "Veuillez adapter scripts/verify.sh pour votre stack (${projectType})"`;
+      }
+
+      const verifySh = `#!/usr/bin/env bash
+set -euo pipefail
+
+# scripts/verify.sh — Le Juge Souverain pour ${projectName}
+echo "=== VÉRIFICATION QUALITÉ : ${projectName} ==="
+
+${verifyScriptCommands}
+
+echo "=== VERDICT : PASS ==="
+`;
+      const verifyPath = path.join(targetDir, "scripts/verify.sh");
+      await fs.writeFile(verifyPath, verifySh, { mode: 0o755 });
+
+      // D. .harness/knowledge/decisions.md
+      const decisionsMd = `# Journal des Décisions d'Architecture (ADR) — ${projectName}
+
+Ce document consigne chronologiquement les décisions prises par les agents et l'équipe.
+
+---
+
+### Date : ${new Date().toISOString().split("T")[0]}
+- **Décision :** Initialisation du harnais agentique via le Hub MCP Forge.
+- **Statut :** Accepté.
+`;
+      await fs.writeFile(path.join(targetDir, ".harness/knowledge/decisions.md"), decisionsMd, "utf-8");
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: `✓ Projet initialisé avec succès dans : ${targetDir}\n- Créé : AGENTS.md\n- Créé : CONVENTIONS.md\n- Créé : scripts/verify.sh (exécutable)\n- Créé : .harness/knowledge/decisions.md\n- Relié au Hub Forge : ${FORGE_HUB_DIR}`,
+          },
+        ],
+      };
+    }
+
+    // 4. Audit Mémoire ASan
     if (name === "forge_audit_memory") {
       const source = String(args?.["sourcePath"] ?? "");
       const resolvedSource = path.resolve(process.cwd(), source);
+      const isC = Boolean(args?.["isC"]);
+      const standard = String(args?.["standard"] ?? (isC ? "c23" : "c++20"));
 
-      // Génération d'un nom de binaire temporaire unique pour éviter les collisions
       const uniqueSuffix = `${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
       const tempBin = `/tmp/forge_asan_${uniqueSuffix}`;
+      const compiler = isC ? "clang" : "clang++";
 
-      const compileAndRunCmd = `clang++ -std=c++20 -Wall -Wextra -Werror -fsanitize=address,undefined -I native/include "${resolvedSource}" -o "${tempBin}" && "${tempBin}"`;
+      const compileAndRunCmd = `${compiler} -std=${standard} -Wall -Wextra -Werror -fsanitize=address,undefined -I "${path.join(FORGE_HUB_DIR, "native/include")}" "${resolvedSource}" -o "${tempBin}" && "${tempBin}"`;
 
       try {
         const { stdout, stderr } = await execAsync(compileAndRunCmd, EXEC_OPTIONS);
@@ -120,22 +333,40 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           ],
         };
       } finally {
-        // Nettoyage garanti du binaire temporaire
         await fs.unlink(tempBin).catch(() => {});
       }
     }
 
-    if (name === "forge_run_benchmarks") {
-      // Exécution RÉELLE du banc de test de performance natif
-      const { stdout, stderr } = await execAsync("make -f native/Makefile bench", EXEC_OPTIONS);
-      return {
-        content: [
-          {
-            type: "text",
-            text: `=== MESURES RÉELLES DU BANC DE PERFORMANCE ===\n${stdout}\n${stderr}`,
-          },
-        ],
-      };
+    // 5. Exécution du Juge Souverain
+    if (name === "forge_verify") {
+      const targetDir = path.resolve(process.cwd(), String(args?.["projectDir"] ?? "."));
+      const verifyScript = path.join(targetDir, "scripts/verify.sh");
+
+      try {
+        const { stdout, stderr } = await execAsync(`bash "${verifyScript}"`, {
+          cwd: targetDir,
+          ...EXEC_OPTIONS,
+          timeout: 120_000,
+        });
+        return {
+          content: [
+            {
+              type: "text",
+              text: `=== VERDICT SOUVERAIN: PASS ===\n${stdout}\n${stderr}`,
+            },
+          ],
+        };
+      } catch (err: any) {
+        return {
+          isError: true,
+          content: [
+            {
+              type: "text",
+              text: `=== VERDICT SOUVERAIN: FAIL (Code ${err.code ?? 1}) ===\n${err.stdout ?? ""}\n${err.stderr ?? ""}\nErreur: ${err.message}`,
+            },
+          ],
+        };
+      }
     }
 
     throw new Error(`Outil inconnu : ${name}`);
@@ -145,7 +376,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       content: [
         {
           type: "text",
-          text: `ÉCHEC DE L'OPÉRATION FORGE:\n${error.message}\nSortie d'erreur:\n${error.stderr || ""}`,
+          text: `ERREUR FORGE MCP:\n${error.message}\n${error.stderr || ""}`,
         },
       ],
     };
@@ -155,10 +386,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  console.error("Serveur MCP Forge v0.2.0 démarré sur le transport standard (stdio).");
+  console.error(`Serveur MCP Global Forge v1.0.0 démarré (Hub: ${FORGE_HUB_DIR}).`);
 }
 
 main().catch((err) => {
-  console.error("Erreur critique serveur MCP:", err);
+  console.error("Erreur critique serveur MCP Forge:", err);
   process.exit(1);
 });

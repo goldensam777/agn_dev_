@@ -104,6 +104,7 @@ REQUIRED_FILES=(
     "native/onyx/runtime.hpp"
     "native/tests/test_onyx.cpp"
     ".harness/playbooks/init-language-corpus.md"
+    ".harness/playbooks/onboard-external-repo.md"
     "docs/references/README.md"
     "scripts/query_book.py"
 )

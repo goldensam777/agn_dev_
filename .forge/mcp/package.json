@@ -2,6 +2,7 @@
   "name": "@forge/mcp-server",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "description": "Serveur MCP composite pour l'environnement agentique Forge",
   "main": "dist/index.js",
   "bin": {

@@ -82,7 +82,10 @@ REQUIRED_FILES=(
     ".harness/knowledge/languages/react/README.md"
     ".harness/knowledge/languages/js/README.md"
     ".harness/knowledge/languages/python/README.md"
+    ".harness/knowledge/domain/compilers/README.md"
     ".harness/playbooks/init-language-corpus.md"
+    "docs/references/README.md"
+    "scripts/query_book.py"
 )
 
 HARNESS_OK=true

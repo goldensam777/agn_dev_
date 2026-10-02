@@ -25,4 +25,5 @@ __pycache__/
 .vscode/
 .idea/
 .DS_Store
-*.log
+# References & Large Binaries
+docs/references/*.pdf

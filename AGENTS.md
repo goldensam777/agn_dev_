@@ -116,6 +116,10 @@ agn_dev_/
   - [x] Structure standardisée (index `README.md`, 5 fondamentaux `core/`, 3 spécialités `domains/`, 2 contrôles `quality/`).
   - [x] 7 corpus experts exhaustifs (77 documents de référence) : C++, Rust, C (C23), TypeScript, React 19, JavaScript, Python (3.12/3.13/3.14).
   - [x] Règle de citation obligatoire dans les revues et intégration dans le juge souverain `scripts/verify.sh`.
+- [x] **Étape 4.8 : Ingestion Théorique des Compilateurs (Le « Corpus Dragon »)**
+  - [x] Bibliothèque de références `docs/references/` (*Dragon Book* 2e éd., *Crafting Interpreters*).
+  - [x] Outil d'interrogation chirurgicale rapide `scripts/query_book.py`.
+  - [x] 8 synthèses algorithmiques fondamentales dans `.harness/knowledge/domain/compilers/` (Automates, Pratt/LR, SDD/AST, SSA/Dominance, Run-time/GC, CFG/Tree tiling, Dataflow equations, Chaitin-Briggs).
 - [ ] **Étape 5 : Ingénierie de Langages (Compilateurs, Interpréteurs & LLVM)**
   - [ ] Architecture type pour grammaire, lexer et parser.
   - [ ] Génération de code intermédiaire LLVM IR.

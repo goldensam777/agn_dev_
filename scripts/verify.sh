@@ -77,6 +77,11 @@ REQUIRED_FILES=(
     ".forge/mcp/src/index.ts"
     ".harness/knowledge/languages/cpp/README.md"
     ".harness/knowledge/languages/rust/README.md"
+    ".harness/knowledge/languages/c/README.md"
+    ".harness/knowledge/languages/ts/README.md"
+    ".harness/knowledge/languages/react/README.md"
+    ".harness/knowledge/languages/js/README.md"
+    ".harness/knowledge/languages/python/README.md"
     ".harness/playbooks/init-language-corpus.md"
 )
 

@@ -112,6 +112,10 @@ agn_dev_/
 - [x] **Étape 4 : Orchestration Fullstack & Interface Scientifique**
   - [x] Liaison `server/` (bridge natif vers Node.js / TypeScript avec tests d'intégration).
   - [x] Application `web/` (React 19 + TypeScript + tableau de bord scientifique temps réel).
+- [x] **Étape 4.5 : Bibliothèque de Connaissances Multi-Langages Haute Précision**
+  - [x] Structure standardisée (index `README.md`, 5 fondamentaux `core/`, 3 spécialités `domains/`, 2 contrôles `quality/`).
+  - [x] 7 corpus experts exhaustifs (77 documents de référence) : C++, Rust, C (C23), TypeScript, React 19, JavaScript, Python (3.12/3.13/3.14).
+  - [x] Règle de citation obligatoire dans les revues et intégration dans le juge souverain `scripts/verify.sh`.
 - [ ] **Étape 5 : Ingénierie de Langages (Compilateurs, Interpréteurs & LLVM)**
   - [ ] Architecture type pour grammaire, lexer et parser.
   - [ ] Génération de code intermédiaire LLVM IR.

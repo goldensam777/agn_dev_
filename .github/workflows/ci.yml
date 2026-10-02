@@ -1,0 +1,33 @@
+name: CI Forge Agentique
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  verify:
+    name: Exécution du Juge Souverain (scripts/verify.sh)
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Récupération du code
+        uses: actions/checkout@v4
+
+      - name: Configuration de Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "npm"
+
+      - name: Installation des dépendances système (Clang, ASan, Make)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang clang-tidy libasan8
+
+      - name: Installation des paquets Node
+        run: npm install
+
+      - name: Exécution du verdict souverain
+        run: bash scripts/verify.sh

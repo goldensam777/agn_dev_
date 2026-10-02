@@ -1,6 +1,6 @@
 # AGENTS.md — Manifeste de la Forge Agentique & Guide de Continuité
 
-Ce document est la **mémoire centrale** et le **fil conducteur** du projet. Tout agent d'IA intervenant sur ce dépôt doit impérativement lire et respecter ce document ainsi que [CONVENTIONS.md](file:///home/samuelyevi/dev/leumas-experience/agn_dev_/CONVENTIONS.md).
+Ce document est la **mémoire centrale** et le **fil conducteur** du projet. Tout agent d'IA intervenant sur ce dépôt doit impérativement lire et respecter ce document ainsi que [CONVENTIONS.md](CONVENTIONS.md).
 
 ---
 

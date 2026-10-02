@@ -58,16 +58,23 @@ fi
 # --- ÉTAPE 5 : Intégrité du Harness & Mémoire ---
 echo -e "\n${YELLOW}[5/5] Vérification de l'intégrité du Harness...${NC}"
 REQUIRED_FILES=(
+    "README.md"
     "AGENTS.md"
     "CONVENTIONS.md"
     ".harness/knowledge/architecture.md"
     ".harness/knowledge/glossary.md"
+    ".harness/knowledge/domain/guide_injection_domaine.md"
     ".harness/playbooks/add-native-module.md"
     ".harness/playbooks/add-endpoint.md"
+    ".harness/examples/canonical_vector_core.cpp"
+    ".github/workflows/ci.yml"
     "contracts/schemas.ts"
     "native/Makefile"
     "server/src/bridge/native_bridge.ts"
     "web/src/App.tsx"
+    "web/src/pages/DashboardPage.tsx"
+    "web/src/components/StatusBadge.tsx"
+    ".forge/mcp/src/index.ts"
 )
 
 HARNESS_OK=true

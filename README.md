@@ -27,8 +27,8 @@ agn_dev_/
 │   ├── docker-compose.yml    # Configuration d'exécution sécurisée avec limites CPU/RAM
 │   └── mcp/                  # Serveur MCP officiel (outils chirurgicaux pour agents)
 ├── .harness/                 # Cerveau de l'agent (modes opératoires et savoir)
-│   ├── knowledge/            # Architecture (ADR), glossaire, injection de domaine
-│   ├── playbooks/            # Guides pas-à-pas (add-endpoint, add-native-module...)
+│   ├── knowledge/            # Architecture (ADR), glossaire, injection de domaine, languages/ (C++, Rust...)
+│   ├── playbooks/            # Guides pas-à-pas (init-language-corpus, add-endpoint, add-native-module...)
 │   └── examples/             # Code canonique et modèles d'implémentation
 ├── scripts/
 │   └── verify.sh             # LE JUGE : lance tous les vérificateurs, verdict PASS/FAIL

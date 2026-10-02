@@ -51,8 +51,10 @@ agn_dev_/
 │   ├── knowledge/            # CE QU'IL DOIT SAVOIR
 │   │   ├── architecture.md   # Carte du projet et décisions prises (ADR)
 │   │   ├── domain/           # Savoir scientifique, spécifications de langages / algorithmes
+│   │   ├── languages/        # Corpus experts par langage (ex: cpp/ avec core, domains, quality)
 │   │   └── glossary.md       # Vocabulaire et définitions du projet
 │   ├── playbooks/            # COMMENT RÉALISER UNE TÂCHE
+│   │   ├── init-language-corpus.md # Initialisation et maintien d'un corpus de connaissances
 │   │   ├── add-endpoint.md   # Procédure pas-à-pas pour une nouvelle route
 │   │   ├── add-component.md  # Procédure pour un composant React
 │   │   └── add-native-module.md # Procédure pour ajouter un module C++ ou Rust

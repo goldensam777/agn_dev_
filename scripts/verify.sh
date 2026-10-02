@@ -75,6 +75,8 @@ REQUIRED_FILES=(
     "web/src/pages/DashboardPage.tsx"
     "web/src/components/StatusBadge.tsx"
     ".forge/mcp/src/index.ts"
+    ".harness/knowledge/languages/cpp/README.md"
+    ".harness/playbooks/init-language-corpus.md"
 )
 
 HARNESS_OK=true

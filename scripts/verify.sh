@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# scripts/verify.sh
-# Ce script doit renvoyer 0 pour que toute tâche soit déclarée accomplie.
+# scripts/verify.sh — Le Juge Souverain de la Forge
+# Règle d'or : Ce script doit renvoyer 0 pour que toute tâche soit déclarée accomplie.
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -14,13 +14,13 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
 echo -e "${BLUE}====================================================${NC}"
-echo -e "${BLUE}          AGN DEV — VERIFIER                        ${NC}"
+echo -e "${BLUE}          FORGE AGENTIQUE — CONTRÔLE DE QUALITÉ     ${NC}"
 echo -e "${BLUE}====================================================${NC}"
 
 FAILURES=0
 
 # --- ÉTAPE 1 : Moteur Natif (C++ & AddressSanitizer) ---
-echo -e "\n${YELLOW}[1/3] Vérification du Moteur Natif C++ (ASan & Bench)...${NC}"
+echo -e "\n${YELLOW}[1/5] Vérification du Moteur Natif C++ (ASan & Bench)...${NC}"
 if make -f native/Makefile clean > /dev/null 2>&1 && make -f native/Makefile; then
     echo -e "${GREEN}  ✓ C++ : 0 warning, 0 fuite mémoire, tests validés sous AddressSanitizer.${NC}"
 else
@@ -29,22 +29,34 @@ else
 fi
 
 # --- ÉTAPE 2 : Frontière Contracts (Validation Zod & TypeScript) ---
-echo -e "\n${YELLOW}[2/3] Vérification de la frontière contracts/ (Zod)...${NC}"
-if [ -d "contracts/node_modules" ]; then
-    if (cd contracts && npx tsc --noEmit); then
-        echo -e "${GREEN}  ✓ Contracts : Typage TypeScript strict et schémas Zod valides.${NC}"
-    else
-        echo -e "${RED}  ✗ ÉCHEC : Erreur de typage dans contracts/schemas.ts.${NC}"
-        FAILURES=$((FAILURES + 1))
-    fi
+echo -e "\n${YELLOW}[2/5] Vérification de la frontière contracts/ (Zod)...${NC}"
+if npm run --workspace=contracts build > /dev/null 2>&1; then
+    echo -e "${GREEN}  ✓ Contracts : Typage TypeScript strict et schémas Zod compilés.${NC}"
 else
-    echo -e "${YELLOW}  ℹ Note : contracts/node_modules non installé, vérification syntaxique TS...${NC}"
-    # Vérification syntaxique rapide si npm install n'a pas encore tourné
-    echo -e "${GREEN}  ✓ Fichiers contracts/ présents et structurés.${NC}"
+    echo -e "${RED}  ✗ ÉCHEC : Erreur de typage dans contracts/schemas.ts.${NC}"
+    FAILURES=$((FAILURES + 1))
 fi
 
-# --- ÉTAPE 3 : Intégrité des Playbooks et du Manifeste ---
-echo -e "\n${YELLOW}[3/3] Vérification de l'intégrité du Harness...${NC}"
+# --- ÉTAPE 3 : Serveur & Pont Natif (Integration Tests) ---
+echo -e "\n${YELLOW}[3/5] Vérification du Serveur & Bridge Natif (Node.js <-> C++)...${NC}"
+if npm run --workspace=server test > /dev/null 2>&1 && npm run --workspace=server build > /dev/null 2>&1; then
+    echo -e "${GREEN}  ✓ Serveur : Bridge natif et tests d'intégration validés.${NC}"
+else
+    echo -e "${RED}  ✗ ÉCHEC : Erreur dans le bridge natif ou les routes serveur.${NC}"
+    FAILURES=$((FAILURES + 1))
+fi
+
+# --- ÉTAPE 4 : Interface Web (React + TS + Vite) ---
+echo -e "\n${YELLOW}[4/5] Vérification du Frontend Web (React & TypeScript)...${NC}"
+if npm run --workspace=web typecheck > /dev/null 2>&1 && npm run --workspace=web build > /dev/null 2>&1; then
+    echo -e "${GREEN}  ✓ Web : Typage strict React et build Vite réussis.${NC}"
+else
+    echo -e "${RED}  ✗ ÉCHEC : Erreur de compilation dans l'interface web.${NC}"
+    FAILURES=$((FAILURES + 1))
+fi
+
+# --- ÉTAPE 5 : Intégrité du Harness & Mémoire ---
+echo -e "\n${YELLOW}[5/5] Vérification de l'intégrité du Harness...${NC}"
 REQUIRED_FILES=(
     "AGENTS.md"
     "CONVENTIONS.md"
@@ -54,6 +66,8 @@ REQUIRED_FILES=(
     ".harness/playbooks/add-endpoint.md"
     "contracts/schemas.ts"
     "native/Makefile"
+    "server/src/bridge/native_bridge.ts"
+    "web/src/App.tsx"
 )
 
 HARNESS_OK=true
@@ -66,7 +80,7 @@ for f in "${REQUIRED_FILES[@]}"; do
 done
 
 if [ "$HARNESS_OK" = true ]; then
-    echo -e "${GREEN}  ✓ Harness complet : tous les guides et contrats sont présents.${NC}"
+    echo -e "${GREEN}  ✓ Harness complet : tous les guides, contrats et composants sont présents.${NC}"
 fi
 
 # --- VERDICT FINAL ---

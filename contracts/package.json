@@ -2,8 +2,15 @@
   "name": "@forge/contracts",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "main": "./dist/schemas.js",
   "types": "./dist/schemas.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/schemas.d.ts",
+      "import": "./dist/schemas.js"
+    }
+  },
   "scripts": {
     "build": "tsc",
     "typecheck": "tsc --noEmit"

@@ -97,15 +97,16 @@ agn_dev_/
 ## 4. État d'Avancement et Feuille de Route
 
 - [x] **Étape 0 : Audit de l'environnement hôte** *(Docker 29.7, Clang 22, GCC 16, Rust 1.97, Node 24, Python 3.14 vérifiés)*.
-- [ ] **Étape 1 : Fondation du Harness**
-  - [x] Création de `AGENTS.md`.
-  - [ ] Création de `CONVENTIONS.md`.
-  - [ ] Mise en place de l'arborescence `.harness/` (glossaire, architecture, premier playbook).
-- [ ] **Étape 2 : Le Juge & la Sandbox**
-  - [ ] Écriture de `scripts/verify.sh`.
-  - [ ] Configuration de la sandbox `.forge/Dockerfile`.
-- [ ] **Étape 3 : Frontière `contracts/` & Premier Module `native/`**
-  - [ ] Initialisation de `contracts/` avec un premier schéma Zod.
-  - [ ] Création d'un module C++ ou Rust avec benchmark et tests sanitizers.
+- [x] **Étape 1 : Fondation du Harness**
+  - [x] Création de `AGENTS.md` et `CONVENTIONS.md`.
+  - [x] Base de connaissances `.harness/` (architecture, glossaire, playbooks).
+- [x] **Étape 2 : Le Juge & la Sandbox**
+  - [x] Écriture de `scripts/verify.sh` (verdict unique automatisé).
+  - [x] Sandbox `.forge/Dockerfile` & `docker-compose.yml`.
+  - [x] Surcouche MCP composite pour projets denses (`.forge/mcp/`).
+- [x] **Étape 3 : Frontière `contracts/` & Premier Module `native/`**
+  - [x] Initialisation de `contracts/` avec schémas Zod (santé, calcul scientifique, Mercuria).
+  - [x] Moteur de calcul C++ dans `native/` validé sous AddressSanitizer (0 fuite) & banc Mercuria (716 Mops/s).
 - [ ] **Étape 4 : Orchestration Fullstack & Interface Scientifique**
-  - [ ] Liaison `server/` (bridge natif) et `web/` (React).
+  - [ ] Liaison `server/` (bridge natif vers Node.js / TypeScript).
+  - [ ] Application `web/` (React + TypeScript + visualisations).

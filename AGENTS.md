@@ -125,6 +125,13 @@ agn_dev_/
   - [x] Corpus transverse dans `.harness/knowledge/domain/fullstack/` (mesure, KPIs, Web Vitals, p99, architecture stateless, observabilité RED/USE, conteneurs durcis).
   - [x] Corpus transverse dans `.harness/knowledge/domain/scientific/` (reproductibilité déterministe, sécurité frontière NaN/Inf, tolérances, orchestration asynchrone).
 - [ ] **Étape 5 : Ingénierie de Langages (Compilateurs, Interpréteurs & LLVM)**
-  - [ ] Architecture type pour grammaire, lexer et parser.
+  - [x] Spécification formelle du langage système **Onyx** (`.harness/knowledge/domain/DOCUMENTATIONS.md`) : syntaxe par indentation, typage linéaire zéro-GC, promotion numérique, algèbre des quaternions et tenseurs multidimensionnels contigus.
+  - [x] Moteur et compilateur natif C++20 sans Garbage Collector (`native/onyx/`) :
+    - Allocateur d'arène contigu (`Arena`) avec suivi déterministe des destructeurs non-triviaux (zéro fuite sous ASan).
+    - Lexer à pile d'indentation indent/dedent et commentaires `(< ... >)`.
+    - Parseur Pratt 10 niveaux de priorité avec associativité à droite de la puissance `^`.
+    - Analyseur statique de consommation linéaire compile-time (`LinearChecker` détectant le use-after-consume sans GC).
+    - Runtime d'exécution sans GC supportant nombres complexes, quaternions non-commutatifs et tenseurs contigus.
+    - 8 bancs d'essai complets (`native/tests/test_onyx.cpp`) intégrés à `native/Makefile` et `scripts/verify.sh` sous ASan.
   - [ ] Génération de code intermédiaire LLVM IR.
   - [ ] Bancs de mesure comparatifs multi-langages.

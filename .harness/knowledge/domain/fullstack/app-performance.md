@@ -1,78 +1,116 @@
-# Domaine Fullstack : Optimisation des Performances Applicatives
+# Optimisation d'Applications Fullstack (mesurée, par couche)
 
-> Méthodologie empirique de mesure, indicateurs clés (Core Web Vitals, p99, Event Loop Delay), hiérarchie des gains d'optimisation et optimisation de la frontière Web↔Serveur.
+> À charger pour toute tâche « rendre l'app plus rapide ». Complète les corpus
+> langages : ce document dit QUOI mesurer et QUELS ordres de grandeur viser ;
+> les corpus disent COMMENT écrire le code.
 
 ---
 
-## 1. La Boucle d'Optimisation Empirique
+## 0. La boucle obligatoire (avant toute optimisation)
 
-Toute optimisation de performance doit suivre la boucle fermée à 5 étapes :
-
-```mermaid
-flowchart LR
-    M1["1. Mesurer (Baseline)"] --> H["2. Émettre Hypothèse"]
-    H --> C["3. Corriger / Optimiser"]
-    C --> M2["4. Mesurer à Nouveau"]
-    M2 -->|Amélioration prouvée| K["5. Garder & Documenter"]
-    M2 -->|Régression ou neutre| R["5. Rejeter (Rollback)"]
+```
+1. MESURER   → baseline chiffrée (pas "ça semble lent")
+2. HYPOTHÈSE → la cause racine la plus probable, une seule
+3. CORRIGER  → le changement minimal qui attaque cette cause
+4. MESURER   → même protocole, même machine, données comparables
+5. GARDER    → seulement si gain ≥ seuil convenu (typ. > 10 % sur la métrique cible)
 ```
 
-> **Règle absolue :** Ne jamais se fier à l'intuition. Si le benchmark ou le profilage ne montre aucun gain mesurable au niveau p95/p99, le commit est rejeté.
+Une optimisation sans baseline chiffrée dans la description de tâche n'existe pas.
 
----
+## 1. Mesure : les métriques qui comptent
 
-## 2. Indicateurs Clés de Performance (KPIs)
-
-### A. Côté Frontend (Core Web Vitals) :
-- **LCP (Largest Contentful Paint) :** $\le 2.5\text{ s}$ (chargement du contenu principal).
-- **INP (Interaction to Next Paint) :** $\le 200\text{ ms}$ (réactivité aux clics/entrées utilisateur).
-- **CLS (Cumulative Layout Shift) :** $\le 0.1$ (stabilité visuelle sans sauts d'éléments).
-
-### B. Côté Backend (Node.js / Express) :
-- **Latence p99 :** $\le 50\text{ ms}$ sur les routes d'API critiques sous charge nominale.
-- **Event Loop Delay :** $\le 10\text{ ms}$ au 99ᵉ percentile, mesuré via `perf_hooks.monitorEventLoopDelay({ resolution: 20 })`.
-
----
-
-## 3. Hiérarchie des Gains d'Optimisation
-
-Ne pas perdre de temps sur des micro-optimisations prématurées : s'attaquer aux goulots d'étranglement dans l'ordre décroissant d'impact :
-
-| Étage | Ordre d'Impact | Goulot Principal & Remède |
+### Frontend (Web Vitals — mesure RUM, pas seulement lab)
+| Métrique | Cible | Ce qu'elle capte |
 |---|---|---|
-| **1. Entrées/Sorties (I/O)** | $10\times$ à $1000\times$ | Élimination des requêtes $N+1$ (DataLoaders), indexation stricte des bases de données, pools de connexions persistants. |
-| **2. Sérialisation & Frontière** | $2\times$ à $10\times$ | Remplacer les sérialisations JSON monolithiques géantes par du streaming (SSE, NDJSON), valider avec des schémas précompilés. |
-| **3. Taille du Bundle Frontend** | $2\times$ à $5\times$ | Découpage dynamique du code (`React.lazy()`, dynamic `import()`), tree-shaking effectif, compression Brotli/Gzip sur CDN. |
-| **4. Rendu & Cycle React** | $1.5\times$ à $3\times$ | Éliminer les re-renders inutiles (`memo`, hooks purs, dérivation sans état synchronisé), virtualisation des listes massives (`TanStack Virtual`). |
-| **5. Micro-calculs CPU** | $1.1\times$ à $1.5\times$ | Optimisations algorithmiques scalaires (seulement si le profileur V8 CPU l'identifie comme hot spot). |
+| LCP (Largest Contentful Paint) | < 2,5 s | vitesse de chargement perçue |
+| INP (Interaction to Next Paint) | < 200 ms | réactivité à l'interaction (remplace FID) |
+| CLS (Cumulative Layout Shift) | < 0,1 | stabilité visuelle |
 
----
+Outils : `web-vitals` en RUM, Lighthouse en lab, React DevTools Profiler pour
+les renders. Le Profiler React CONFIRME un soupçon de re-render excessif — il
+ne justifie jamais du `memo` à l'aveugle.
 
-## 4. Optimisation de la Frontière Web $\leftrightarrow$ Serveur
+### Backend
+| Métrique | Instrument |
+|---|---|
+| Latence p50 / p95 / **p99** | APM ou middleware de timing — c'est p99 qui fait mal, pas la moyenne |
+| Event loop delay Node | `perf_hooks.monitorEventLoopDelay()` — détecteur n°1 de boucle bloquée |
+| Temps de réponse DB par requête | logs de requêtes lentes + EXPLAIN |
+| Trafic : req/s, erreurs/s | métriques RED (voir platform-production.md) |
 
-1. **Compression Négociée :** Activer systématiquement la compression **Brotli** (`br`) en priorité, puis Gzip pour les payloads JSON et les assets statiques.
-2. **Gestion de Cache HTTP Déterministe :**
-   - Assets immuables (`/assets/*.hash.js`) : `Cache-Control: public, max-age=31536000, immutable`.
-   - Données API dynamiques : Utiliser les en-têtes `ETag` et `If-None-Match` pour retourner un code `304 Not Modified` ultra-rapide lorsque les données n'ont pas changé.
-3. **Flux de Données Massifs (Zéro-Copie) :**
-   - Pour les graphiques et tenseurs scientifiques : ne pas convertir de grands tableaux de flottants en JSON textuel. Transmettre des buffers binaires natifs (`ArrayBuffer`, `Float64Array`) via WebSocket ou fetch direct de binaire brut.
+**Règle d'or backend :** si l'event loop delay dépasse ~50 ms en charge, la cause
+est presque toujours du travail CPU synchrone dans le process Node (JSON énorme,
+regex catastrophique, boucle chaude). La correction est de déplacer ce travail :
+`worker_threads`, ou notre propre pont natif (`server/src/bridge/` — c'est
+exactement pour ça qu'il existe).
 
----
+## 2. Backend Node : les gains classiques, par ordre d'impact
 
-## 5. Les 6 Anti-Patterns Formellement Interdits
+1. **Ne jamais bloquer la boucle.** Tout traitement CPU > ~10 ms hors requête :
+   worker_threads ou moteur natif. Décision architecturale n°1.
+2. **Sérialisation.** Le JSON est le coût caché n°1 des API : gros payloads,
+   champs jamais lus, objets profonds. Réponses = DTO plats, champs utilisés.
+   Paginer TOUT ce qui peut dépasser quelques centaines d'éléments.
+3. **HTTP.** Keep-alive (agent persistant), compression gzip/brotli (seuil ~1-2 ko,
+   le CPU de compression se paie — mesurer), `Cache-Control` + ETag/304 sur les
+   ressources cachables, HTTP/2 en ingress.
+4. **Accès aux données.** Le pattern N+1 est un incident en costume de feature.
+   Batch, index sur les colonnes des WHERE réels, projections qui ne ramènent
+   que les colonnes lues.
+5. **Cache.** Cache-aside avec TTL explicite ET stratégie d'invalidation écrite
+   (pas « on verra »). Distinction : cache de données (Redis) vs cache de calcul
+   (empreinte → résultat, cf. `scientific-in-production.md`). Un cache sans
+   politique d'invalidation est une machine à données pourries.
+6. **Backpressure.** Traiter par streams quand le volume est non borné
+   (`highWaterMark` respecté) ; mieux vaut répondre 429 qu'empiler 10 000
+   requêtes en mémoire (cf. platform-production.md).
 
-1. ❌ **Blocage de l'Event Loop Node.js :** Appel synchrone (`fs.readFileSync`, calcul lourd de hachage sans worker thread ou cœur natif).
-2. ❌ **Cache Mémoire Sans Limite :** Utilisation d'un objet global `{}` ou d'une `Map` sans politique d'éviction LRU ni TTL (fuite mémoire assurée).
-3. ❌ **Cascades Réseau (*Waterfall Requests*) :** Le client effectue une requête A, attend, puis fait la requête B, puis C. Exiger l'agrégation ou le parallélisme via `Promise.all()`.
-4. ❌ **Polling Agressif :** Interroger une route en boucle toutes les 500 ms au lieu d'utiliser Server-Sent Events (SSE) ou WebSocket.
-5. ❌ **Bundle Frontend Monolithique :** Charger l'intégralité des routes, graphiques lourds et éditeurs dans le bundle JavaScript initial au premier chargement.
-6. ❌ **Optimisation Prématurée à l'Aveugle :** Réécrire du code lisible sous prétexte de « micro-performance » sans trace de profilage l'ayant identifié comme goulot.
+## 3. Frontend React : les gains classiques, par ordre d'impact
 
----
+1. **Le bundle.** Levier n°1 sur LCP/INP. Budget JS gzip (~200 ko exécutés au
+   démarrage, à ajuster au projet), code splitting par route (`React.lazy`),
+   imports ciblés (jamais de barrel qui traîne toute la lib), analyse régulière
+   du bundle (source-map-explorer / Rollup visualizer).
+2. **Le serveur d'état.** React Query / TanStack Query : cache serveur avec
+   déduplication, revalidation, stale-while-revalidate. Ne jamais re-fabriquer
+   ça à la main dans des `useEffect`.
+3. **Le rendu.** Composants purs (mêmes props → même rendu) ; mémoïsation SUR
+   MESURE et après mesure du Profiler ; listes longues → virtualisation
+   (au-delà de ~1 000 lignes, obligatoire) ; `key` stables ; mises à jour non
+   urgentes dans `startTransition`.
+4. **Les assets.** Images : dimensions fixes dans le JSX (anti-CLS), formats
+   AVIF/WebP, lazy below-the-fold, l'image LCP en `<link rel="preload">`.
+   Fonts : subset, `font-display: swap`, préchargée.
+5. **Le polling.** Jamais de polling < 1 s : WebSocket ou revalidation React Query
+   avec backoff. (Voir `canonical_scientific_canvas.tsx` pour le rendu à 60 fps
+   hors reconciler.)
 
-## 6. Checklist de Contrôle pour l'Agent
+## 4. La frontière Web ↔ Serveur
 
-- [ ] L'optimisation proposée est-elle étayée par une mesure de latence ou un profil mémoire chiffré ?
-- [ ] L'Event Loop Node.js est-elle exempte de tout calcul bloquant supérieur à 10 ms ?
-- [ ] Les listes de données volumineuses côté client sont-elles paginées ou virtualisées ?
-- [ ] Les payloads binaires volumineux évitent-ils la sérialisation en chaînes JSON ?
+- Valider les réponses avec Zod **côté client aussi** (`web/src/api/client.ts`
+  le fait déjà : `ResponseSchema.parse(data)`). Le contrat est une clôture à
+  double sens.
+- `AbortController` pour annuler les requêtes obsolètes (navigation, frappe
+  utilisateur) — une réponse qui arrive trop tard coûte du réseau ET du rendu.
+- Taille de payload bornée côté contrat (`contracts/schemas.ts` : `max(10_000_000)`
+  sur `dimensions` — même discipline sur les tableaux).
+
+## 5. Anti-patterns interdits (spécifiques à la perf)
+
+1. Optimiser sans baseline chiffrée.
+2. `useMemo`/`useCallback`/`memo` posés « par précaution » (lisibilité coûteuse,
+   gain non prouvé).
+3. Compression activée sur les payloads déjà compressés (images, vidéos).
+4. `await` séquentiel de requêtes indépendantes (`Promise.all` par défaut).
+5. Re-render d'une liste entière pour un changement sur une ligne (état mal
+   localisé — corpus react/core/state-management.md).
+6. « On mettra un cache » sans stratégie d'invalidation écrite.
+
+## Checklist avant de clore une tâche perf
+
+- [ ] Baseline chiffrée citée dans la description de tâche
+- [ ] Même protocole de mesure avant/après
+- [ ] Gain documenté (ou abandon documenté — un « ça ne change rien » mesuré a de la valeur)
+- [ ] p99 regardé, pas seulement la moyenne
+- [ ] `bash scripts/verify.sh` : exit 0

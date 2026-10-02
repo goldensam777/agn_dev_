@@ -1,28 +1,33 @@
-# Domaine Fullstack : Performance & Plateforme de Production
+# Domaine Transverse : Applications & Plateformes Fullstack en Production
 
-> Base de connaissances transverse pour l'ingénierie, l'optimisation et l'exploitation des applications fullstack modernes (React, Node.js, TypeScript) en environnement de production haute disponibilité.
+> Corpus transverse, au-dessus des corpus langages. À charger UNIQUEMENT quand la
+> tâche dépasse le périmètre d'un seul langage : « optimiser l'app », « mettre en
+> prod », « scaler la plateforme », « fiabiliser un déploiement ».
+> Pour écrire du code dans UN langage → corpus `.harness/knowledge/languages/<lang>/`.
 
----
+## Structure
 
-## 1. Organisation du Domaine
+```
+fullstack/
+├── README.md                 ← ce fichier (index + règles de chargement)
+├── app-performance.md        ← optimiser une app fullstack (mesuré, par couche)
+└── platform-production.md    ← faire tourner une PLATEFORME fullstack en prod
+```
 
-| Fichier | Sujet Traité |
+## Règles de chargement (routage par le lead/playbook)
+
+| Situation | Charger |
 |---|---|
-| [`app-performance.md`](app-performance.md) | Boucle de mesure empirique, Core Web Vitals, latence p99, Event Loop delay, optimisation I/O et frontière Web↔Serveur. |
-| [`platform-production.md`](platform-production.md) | Architecture sans état, cycle de vie (liveness/readiness, arrêt gracieux), résilience (breaker, bulkhead), observabilité (RED/USE, OpenTelemetry), conteneurs durcis. |
+| Tâche « rendre plus rapide » (sans mise en prod) | `app-performance.md` |
+| Tâche « déployer / scaler / fiabiliser / monitorer » | `platform-production.md` |
+| Les deux (refonte perf avant montée en charge) | les deux, dans cet ordre |
+| Review d'une modif touchant perf ou prod | le document pertinent + `quality/` du langage |
 
----
+## Principe fondateur (non négociable)
 
-## 2. Règles de Chargement (Matrice de Routage)
+**On n'optimise rien qu'on n'a pas mesuré.** CONVENTIONS.md : « performance mesurée,
+jamais présumée ». Toute recommandation de ces documents s'applique APRÈS capture
+d'une métrique de référence, et toute optimisation livrée DOIT montrer le avant/après.
 
-| Phase / Tâche | Fichier à charger |
-|---|---|
-| Optimisation du temps de réponse API, requêtes SQL/NoSQL, réduction de bundle React | `fullstack/app-performance.md` |
-| Conception de l'architecture serveur, déploiement conteneurisé, gestion des pannes, monitoring | `fullstack/platform-production.md` |
-| Revue de code d'une nouvelle route ou fonctionnalité fullstack | `fullstack/app-performance.md` + `fullstack/platform-production.md` |
-
----
-
-## 3. Règle Fondamentale de la Forge
-
-> **Mesurer d'abord, optimiser ensuite :** Aucune modification de code visant la performance ne doit être acceptée sans métrique chiffrée avant/après (profilage CPU/mémoire, latence p95/p99 mesurée sur banc).
+Le juge local reste `scripts/verify.sh` ; les juges de prod sont les métriques
+(voir `platform-production.md` → Observabilité).

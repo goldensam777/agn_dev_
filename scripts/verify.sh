@@ -107,6 +107,7 @@ REQUIRED_FILES=(
     ".harness/playbooks/onboard-external-repo.md"
     "docs/references/README.md"
     "scripts/query_book.py"
+    "scripts/forge_init.sh"
 )
 
 HARNESS_OK=true

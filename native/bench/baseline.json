@@ -1,18 +1,20 @@
 {
   "benchmark": "dot_product",
   "metric": "mops",
-  "baseline_value": 707.16,
+  "baseline_value": 707.74,
   "unit": "Millions d'op\u00e9rations/sec",
-  "reference_stddev": 21.36,
-  "max_regression_percent": 9.06,
-  "runs": 5,
+  "reference_stddev": 24.66,
+  "max_regression_percent": 10.45,
+  "runs": 10,
+  "warmup": 1,
   "reference_machine": {
     "cpu": "11th Gen Intel(R) Core(TM) i7-1165G7 @ 2.80GHz",
     "cores": "8",
     "os": "Linux-7.1.9-200.fc44.x86_64-x86_64-with-glibc2.43",
-    "architecture": "x86_64"
+    "architecture": "x86_64",
+    "power_state": "battery"
   },
-  "last_updated": "2026-10-03T19:40:57.190107",
+  "last_updated": "2026-10-03T20:13:04.285601",
   "description": "Banc de performance Mercuria dot_product (N = 10,000,000 \u00e9l\u00e9ments)",
-  "update_procedure": "Pour actualiser cette machine : python3 scripts/compare_bench.py --update --runs 5"
+  "update_procedure": "Pour actualiser cette machine : python3 scripts/compare_bench.py --update --runs 10 --warmup 1"
 }

@@ -1,0 +1,11 @@
+[package]
+name = "forge-math-core"
+version = "0.1.0"
+edition = "2021"
+authors = ["Samuel Yevi", "Forge Agentique"]
+description = "Module natif Rust haute performance pour la Forge Agentique (équivalent math_core)"
+
+[dependencies]
+
+[lib]
+crate-type = ["lib"]

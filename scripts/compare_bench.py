@@ -2,9 +2,10 @@
 """
 scripts/compare_bench.py — Comparateur et gestionnaire de baseline de performance multi-machines
 
-Exécute le banc de mesure plusieurs fois, calcule la médiane pour éliminer le bruit,
-compare la performance à la machine de référence correspondante, et gère les références
-par architecture sous native/bench/baselines/<cpu_slug>.json.
+Exécute le banc de mesure plusieurs fois après une phase de chauffe, calcule la médiane
+pour éliminer le bruit, évalue la dispersion 3-sigma (reference_stddev), compare la performance
+à la machine de référence correspondante, et gère les références par architecture
+sous native/bench/baselines/<cpu_slug>.json.
 """
 
 from __future__ import annotations
@@ -35,10 +36,35 @@ def cpu_to_slug(cpu: str) -> str:
     s = re.sub(r"[^a-zA-Z0-9]+", "_", cpu.lower()).strip("_")
     return s or "unknown_cpu"
 
-def run_benchmark(bin_path: Path, runs: int) -> list[float]:
-    values: list[float] = []
+def is_on_ac_power() -> tuple[bool, str]:
+    """Détecte si la machine est branchée sur secteur."""
+    try:
+        for p in Path("/sys/class/power_supply").glob("*"):
+            type_file = p / "type"
+            online_file = p / "online"
+            if type_file.exists() and "mains" in type_file.read_text().lower():
+                if online_file.exists() and online_file.read_text().strip() == "1":
+                    return True, f"Secteur connecté ({p.name})"
+        for p in Path("/sys/class/power_supply").glob("BAT*"):
+            status_file = p / "status"
+            if status_file.exists():
+                st = status_file.read_text().strip().lower()
+                if st == "charging" or st == "full":
+                    return True, f"Secteur connecté (Batterie {st})"
+    except Exception:
+        pass
+    return False, "Sur batterie (secteur déconnecté)"
+
+def run_benchmark(bin_path: Path, runs: int, warmup: int = 1) -> list[float]:
     pattern = re.compile(r"Débit\s*:\s*([0-9.]+)\s*Millions", re.IGNORECASE)
 
+    for w in range(1, warmup + 1):
+        result = subprocess.run([str(bin_path)], capture_output=True, text=True, check=True)
+        match = pattern.search(result.stdout)
+        if match:
+            print(f"  [Chauffe {w}/{warmup}] Débit mesuré : {float(match.group(1)):.2f} Mops/s (ignoré pour la statistique)")
+
+    values: list[float] = []
     for i in range(1, runs + 1):
         result = subprocess.run([str(bin_path)], capture_output=True, text=True, check=True)
         match = pattern.search(result.stdout)
@@ -51,7 +77,7 @@ def run_benchmark(bin_path: Path, runs: int) -> list[float]:
     return values
 
 def calculate_reference_threshold(measurements: list[float], baseline_value: float) -> tuple[float, float]:
-    """Calcule la dispersion de référence et le seuil de régression associé."""
+    """Calcule la dispersion de référence (3-sigma) et le seuil de régression associé."""
     stddev = statistics.stdev(measurements) if len(measurements) >= 2 else 0.0
     dispersion_pct = (3.0 * stddev / baseline_value * 100.0) if baseline_value else 0.0
     return stddev, max(5.0, dispersion_pct)
@@ -61,8 +87,9 @@ def main() -> int:
     parser.add_argument("--baseline", type=Path, default=Path("native/bench/baseline.json"), help="Fichier JSON de référence par défaut")
     parser.add_argument("--baselines-dir", type=Path, default=Path("native/bench/baselines"), help="Répertoire des références multi-machines")
     parser.add_argument("--bin", type=Path, default=Path("bin/bench_math_core"), help="Binaire du banc de mesure")
-    parser.add_argument("--runs", type=int, default=None, help="Nombre d'exécutions (défaut: valeur dans baseline ou 5)")
-    parser.add_argument("--threshold", type=float, default=None, help="Seuil de régression maximum en %% (défaut: valeur dans baseline ou 5.0)")
+    parser.add_argument("--runs", type=int, default=None, help="Nombre d'exécutions comptabilisées (défaut: valeur dans baseline ou 5)")
+    parser.add_argument("--warmup", type=int, default=1, help="Nombre d'exécutions préalables de chauffe (défaut: 1)")
+    parser.add_argument("--threshold", type=float, default=None, help="Seuil de régression maximum en %% (défaut: valeur calculée dans baseline)")
     parser.add_argument("--update", action="store_true", help="Met à jour la baseline pour cette machine")
     args = parser.parse_args()
 
@@ -90,7 +117,7 @@ def main() -> int:
         print(f"Machine actuelle     : {current_cpu} ({platform.system()} {platform.machine()})")
         print(f"Aucune référence existante dans {machine_baseline_path} ni {args.baseline}.")
         print(f"\nPour enregistrer une référence pour cette machine :")
-        print(f"  python3 scripts/compare_bench.py --update --runs 5")
+        print(f"  python3 scripts/compare_bench.py --update --runs 10 --warmup 1")
         print("====================================================")
         return 0
 
@@ -106,7 +133,7 @@ def main() -> int:
         print("\nLe matériel d'exécution diffère de la référence enregistrée.")
         print("Une comparaison de débit entre architectures différentes n'est pas significative.")
         print("\nPour enregistrer une baseline de référence dédiée pour cette machine :")
-        print("  python3 scripts/compare_bench.py --update --runs 5")
+        print("  python3 scripts/compare_bench.py --update --runs 10 --warmup 1")
         print(f"Fichier cible : {machine_baseline_path}")
         print("====================================================")
         return 0
@@ -114,15 +141,17 @@ def main() -> int:
     runs = int(args.runs if args.runs is not None else baseline_data.get("runs", 5))
     threshold_pct = float(args.threshold if args.threshold is not None else baseline_data.get("max_regression_percent", 5.0))
     baseline_val = float(baseline_data.get("baseline_value", 1000.0))
+    on_ac, power_info = is_on_ac_power()
 
     print(f"=== COMPARAISON DU BANC DE PERFORMANCE ({baseline_data.get('benchmark', 'dot_product')}) ===")
     print(f"Machine actuelle : {current_cpu} ({platform.system()} {platform.machine()})")
+    print(f"Alimentation     : {power_info}")
     print(f"Référence active : {baseline_val:.2f} Mops/s ({active_baseline_path})")
-    print(f"Seuil de tolérance : {threshold_pct:.1f} %")
-    print(f"Nombre d'itérations : {runs}")
+    print(f"Seuil tolérance  : {threshold_pct:.2f} %")
+    print(f"Itérations       : {runs} (après {args.warmup} chauffe(s))")
 
     try:
-        measurements = run_benchmark(args.bin, runs)
+        measurements = run_benchmark(args.bin, runs, warmup=args.warmup)
     except Exception as e:
         print(f"ERREUR lors de l'exécution du banc : {e}", file=sys.stderr)
         return 1
@@ -134,7 +163,7 @@ def main() -> int:
     if args.update:
         reference_stddev, threshold_pct = calculate_reference_threshold(measurements, med)
         print(f"Écart-type de référence : {reference_stddev:.2f} Mops/s")
-        print(f"Seuil calculé : max(5.0 %, 3 × écart-type / médiane) = {threshold_pct:.2f} %")
+        print(f"Seuil calculé (3-sigma) : max(5.0 %, 3 × écart-type / médiane) = {threshold_pct:.2f} %")
         new_data = {
             "benchmark": "dot_product",
             "metric": "mops",
@@ -143,15 +172,17 @@ def main() -> int:
             "reference_stddev": round(reference_stddev, 2),
             "max_regression_percent": round(threshold_pct, 2),
             "runs": runs,
+            "warmup": args.warmup,
             "reference_machine": {
                 "cpu": current_cpu,
                 "cores": subprocess.check_output(["nproc"]).decode().strip(),
                 "os": platform.platform(),
                 "architecture": platform.machine(),
+                "power_state": "ac_mains" if on_ac else "battery",
             },
             "last_updated": datetime.datetime.now().isoformat(),
             "description": "Banc de performance Mercuria dot_product (N = 10,000,000 éléments)",
-            "update_procedure": f"Pour actualiser cette machine : python3 scripts/compare_bench.py --update --runs {runs}",
+            "update_procedure": f"Pour actualiser cette machine : python3 scripts/compare_bench.py --update --runs {runs} --warmup {args.warmup}",
         }
         with open(machine_baseline_path, "w", encoding="utf-8") as f:
             json.dump(new_data, f, indent=2)

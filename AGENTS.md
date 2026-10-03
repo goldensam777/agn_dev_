@@ -133,6 +133,11 @@ agn_dev_/
     - Analyseur statique de consommation linéaire compile-time (`LinearChecker` détectant le use-after-consume sans GC).
     - Runtime d'exécution sans GC supportant nombres complexes, quaternions non-commutatifs et tenseurs contigus.
     - 8 bancs d'essai complets (`examples/test_onyx.cpp`) intégrés à `native/Makefile` et `scripts/verify.sh` sous ASan.
-    - Campagne de fuzzing syntaxique & mémoire sous ASan/UBsan (`examples/onyx/fuzz_onyx.cpp`, 5000 itérations, 0 crash, 0 fuite) intégrée en étape 2 de `scripts/verify.sh`.
+  - [x] Module natif Rust de référence `forge-math-core` (`native/rust/`) conforme à la politique Rust-first :
+    - Implémentation vectorisée sans code unsafe (`#![deny(unsafe_code)]`, `#![deny(missing_docs)]`).
+    - Produit scalaire SIMD, Monte Carlo Pi déterministe et multiplication matricielle cache-friendly $i-k-j$.
+    - Étape 2 dédiée dans `scripts/verify.sh` : `cargo fmt --check`, `cargo clippy -- -D warnings`, `cargo test` avec fallback `NON EXÉCUTÉ`.
+  - [x] Protocole de banc de mesure renforcé (1 passe de chauffe uncounted + 10 exécutions statistiques, détection d'état d'alimentation secteur/batterie).
   - [ ] Génération de code intermédiaire LLVM IR.
   - [ ] Bancs de mesure comparatifs multi-langages.
+

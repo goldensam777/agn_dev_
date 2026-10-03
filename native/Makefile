@@ -34,11 +34,19 @@ $(BIN_DIR)/test_onyx: $(ONYX_SRCS) examples/test_onyx.cpp | $(BIN_DIR)
 $(BIN_DIR)/bench_math_core: native/src/math_core.cpp native/bench/bench_math_core.cpp | $(BIN_DIR)
 	$(CXX) $(CXXFLAGS) $(OPT_FLAGS) -I native/include $^ -o $@
 
+# Compilation de l'outil de Fuzzing sous AddressSanitizer
+$(BIN_DIR)/fuzz_onyx: $(ONYX_SRCS) examples/onyx/fuzz_onyx.cpp | $(BIN_DIR)
+	$(CXX) $(CXXFLAGS) $(ASAN_FLAGS) -I native/include -I examples $^ -o $@
+
 test_asan: $(BIN_DIR)/test_math_core $(BIN_DIR)/test_onyx
 	@echo "--- Exécution des tests sous AddressSanitizer (Math Core) ---"
 	./$(BIN_DIR)/test_math_core
 	@echo "--- Exécution des tests sous AddressSanitizer (Onyx Engine) ---"
 	./$(BIN_DIR)/test_onyx
+
+fuzz: $(BIN_DIR)/fuzz_onyx
+	@echo "--- Exécution de la campagne de Fuzzing sous AddressSanitizer ---"
+	./$(BIN_DIR)/fuzz_onyx --iterations 5000
 
 bench: $(BIN_DIR)/bench_math_core
 	@echo "--- Exécution du banc Mercuria ---"

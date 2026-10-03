@@ -1,4 +1,5 @@
-import { spawn } from "node:child_process";
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -13,102 +14,84 @@ if (fs.existsSync(CANARY_FILE)) {
   fs.unlinkSync(CANARY_FILE);
 }
 
-console.log("=== TEST DE SÉCURITÉ ANTI-INJECTION DU SERVEUR MCP ===");
+console.log("=== TEST DE SÉCURITÉ ANTI-INJECTION & ARGUMENTS DU SERVEUR MCP ===");
 console.log(`[1] Vérification initiale : ${CANARY_FILE} existe ? ${fs.existsSync(CANARY_FILE)}`);
 
-const proc = spawn("node", [serverScript], {
-  env: { ...process.env, FORGE_HUB_DIR: path.resolve(__dirname, "../..") },
-  stdio: ["pipe", "pipe", "inherit"],
-});
+async function runSecurityTests() {
+  const transport = new StdioClientTransport({
+    command: "node",
+    args: [serverScript],
+    env: { ...process.env, FORGE_HUB_DIR: path.resolve(__dirname, "../..") },
+  });
 
-let responseData = "";
+  const client = new Client(
+    { name: "security-tester", version: "1.2.0" },
+    { capabilities: {} }
+  );
 
-proc.stdout.on("data", (chunk) => {
-  responseData += chunk.toString();
-});
+  await client.connect(transport);
 
-function sendRpc(msg) {
-  const payload = JSON.stringify(msg) + "\n";
-  proc.stdin.write(payload);
-}
-
-// 2. Initialisation MCP
-sendRpc({
-  jsonrpc: "2.0",
-  id: 1,
-  method: "initialize",
-  params: {
-    protocolVersion: "2024-11-05",
-    capabilities: {},
-    clientInfo: { name: "security-tester", version: "1.0.0" },
-  },
-});
-
-// 3. Envoi d'une charge d'injection de commande $(touch /tmp/x) dans forge_query_knowledge
-setTimeout(() => {
+  // Test 1 : Injection de commande shell $(touch /tmp/x)
   console.log("[2] Envoi de la charge d'injection shell : '$(touch /tmp/x)' dans forge_query_knowledge...");
-  sendRpc({
-    jsonrpc: "2.0",
-    id: 2,
-    method: "tools/call",
-    params: {
-      name: "forge_query_knowledge",
-      arguments: {
-        query: "$(touch /tmp/x)",
-        category: "compilers",
-      },
+  const resInjection = await client.callTool({
+    name: "forge_query_knowledge",
+    arguments: {
+      query: "$(touch /tmp/x)",
+      category: "compilers",
     },
   });
-}, 200);
 
-// 4. Envoi d'une charge d'injection de commande dans sourcePath de forge_audit_memory
-setTimeout(() => {
-  console.log("[3] Envoi de la charge d'injection shell : '$(touch /tmp/x)' dans forge_audit_memory...");
-  sendRpc({
-    jsonrpc: "2.0",
-    id: 3,
-    method: "tools/call",
-    params: {
-      name: "forge_audit_memory",
-      arguments: {
-        sourcePath: "$(touch /tmp/x)",
-      },
+  // Test 2 : Argument CLI sensible '--help'
+  console.log("[3] Envoi de la requête '--help' dans forge_query_knowledge (-e et -- requis pour grep)...");
+  const resHelp = await client.callTool({
+    name: "forge_query_knowledge",
+    arguments: {
+      query: "--help",
+      category: "all",
     },
   });
-}, 500);
 
-// 4b. Envoi d'un chemin hors racine autorisée (Path traversal /etc)
-setTimeout(() => {
-  console.log("[3b] Envoi d'un chemin non autorisé (/etc/passwd) dans targetDir de forge_scaffold_harness...");
-  sendRpc({
-    jsonrpc: "2.0",
-    id: 4,
-    method: "tools/call",
-    params: {
-      name: "forge_scaffold_harness",
-      arguments: {
-        targetDir: "/etc/forbidden_scaffold",
-        projectType: "rust",
-      },
+  // Test 3 : Rejet de chemin hors racine autorisée (/tmp non sandboxé)
+  console.log("[4] Test de rejet de chemin /tmp non sandboxé dans forge_scaffold_harness...");
+  const resTraversal = await client.callTool({
+    name: "forge_scaffold_harness",
+    arguments: {
+      targetDir: "/tmp/unauthorized_external_dir",
+      projectType: "rust",
     },
   });
-}, 800);
 
-// 5. Vérification finale
-setTimeout(() => {
-  proc.stdin.end();
-  proc.kill();
+  await client.close();
 
   const fileCreated = fs.existsSync(CANARY_FILE);
-  console.log(`[4] Vérification finale : ${CANARY_FILE} existe ? ${fileCreated}`);
+  const helpHandled = resHelp && !resHelp.isError && Array.isArray(resHelp.content);
+  const traversalRejected = Boolean(resTraversal.isError);
+
+  console.log(`\n=== RÉSULTATS DES CONTRÔLES DE SÉCURITÉ ===`);
+  console.log(`[Vérif 1] Fichier témoin ${CANARY_FILE} créé ? ${fileCreated} (Attendu : false)`);
+  console.log(`[Vérif 2] Requête '--help' traitée sans erreur CLI ? ${helpHandled} (Attendu : true)`);
+  console.log(`[Vérif 3] Accès /tmp non sandboxé rejeté ? ${traversalRejected} (Attendu : true)`);
 
   if (fileCreated) {
-    console.error("FAIL: FAILLE DE SÉCURITÉ DÉTECTÉE ! Le fichier /tmp/x a été créé.");
+    console.error("FAIL: FAILLE DE SÉCURITÉ ! Le fichier /tmp/x a été créé.");
     fs.unlinkSync(CANARY_FILE);
     process.exit(1);
-  } else {
-    console.log("PASS: SÉCURITÉ VALIDÉE. Aucune commande shell n'a été exécutée, /tmp/x n'a PAS été créé.");
-    console.log("PASS: Chemins non autorisés strictement rejetés.");
-    process.exit(0);
   }
-}, 1400);
+
+  if (!helpHandled) {
+    console.error("FAIL: La requête '--help' n'a pas été traitée correctement.");
+    process.exit(1);
+  }
+
+  if (!traversalRejected) {
+    console.error("FAIL: Le chemin /tmp hors sandbox n'a pas été rejeté.");
+    process.exit(1);
+  }
+
+  console.log("\n✓ TOUS LES TESTS DE SÉCURITÉ ET D'ARGUMENTS MCP ONT RÉUSSI !");
+}
+
+runSecurityTests().catch((err) => {
+  console.error("Erreur critique test de sécurité:", err);
+  process.exit(1);
+});

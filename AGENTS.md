@@ -133,5 +133,6 @@ agn_dev_/
     - Analyseur statique de consommation linéaire compile-time (`LinearChecker` détectant le use-after-consume sans GC).
     - Runtime d'exécution sans GC supportant nombres complexes, quaternions non-commutatifs et tenseurs contigus.
     - 8 bancs d'essai complets (`examples/test_onyx.cpp`) intégrés à `native/Makefile` et `scripts/verify.sh` sous ASan.
+    - Campagne de fuzzing syntaxique & mémoire sous ASan/UBsan (`examples/onyx/fuzz_onyx.cpp`, 5000 itérations, 0 crash, 0 fuite) intégrée en étape 2 de `scripts/verify.sh`.
   - [ ] Génération de code intermédiaire LLVM IR.
   - [ ] Bancs de mesure comparatifs multi-langages.

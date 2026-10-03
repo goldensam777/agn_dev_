@@ -46,35 +46,41 @@ step1_native() {
     make -f native/Makefile clean
     make -f native/Makefile
 }
-run_step "[1/6]" "Vérification du Moteur Natif C++ (ASan & Moteur Onyx)" "$LOG_DIR/step1_native.log" step1_native
+run_step "[1/7]" "Vérification du Moteur Natif C++ (ASan & Moteur Onyx)" "$LOG_DIR/step1_native.log" step1_native
 
-# --- ÉTAPE 2 : Non-Régression du Banc de Mesure (Médiane vs Baseline 5%) ---
-step2_bench() {
+# --- ÉTAPE 2 : Fuzzing Syntaxique & Mémoire sous ASan/UBsan (Pilier 3) ---
+step2_fuzz() {
+    make -f native/Makefile fuzz
+}
+run_step "[2/7]" "Campagne de Fuzzing Syntaxique & Mémoire (5000 itérations ASan/UBsan)" "$LOG_DIR/step2_fuzz.log" step2_fuzz
+
+# --- ÉTAPE 3 : Non-Régression du Banc de Mesure (Médiane vs Baseline 5%) ---
+step3_bench() {
     python3 scripts/compare_bench.py --baseline native/bench/baseline.json --bin bin/bench_math_core --runs 3 --threshold 5.0
 }
-run_step "[2/6]" "Comparaison du Banc à baseline.json (Médiane de 3 runs, seuil 5%)" "$LOG_DIR/step2_bench.log" step2_bench
+run_step "[3/7]" "Comparaison du Banc à baseline.json (Médiane de 3 runs, seuil 5%)" "$LOG_DIR/step3_bench.log" step3_bench
 
-# --- ÉTAPE 3 : Frontière Contracts (Validation Zod & TypeScript) ---
-step3_contracts() {
+# --- ÉTAPE 4 : Frontière Contracts (Validation Zod & TypeScript) ---
+step4_contracts() {
     npm run --workspace=contracts build
 }
-run_step "[3/6]" "Vérification de la frontière contracts/ (Zod & TypeScript)" "$LOG_DIR/step3_contracts.log" step3_contracts
+run_step "[4/7]" "Vérification de la frontière contracts/ (Zod & TypeScript)" "$LOG_DIR/step4_contracts.log" step4_contracts
 
-# --- ÉTAPE 4 : Serveur & Pont Natif (Integration Tests) ---
-step4_server() {
+# --- ÉTAPE 5 : Serveur & Pont Natif (Integration Tests) ---
+step5_server() {
     npm run --workspace=server test
     npm run --workspace=server build
 }
-run_step "[4/6]" "Vérification du Serveur & Bridge Natif (Node.js <-> C++)" "$LOG_DIR/step4_server.log" step4_server
+run_step "[5/7]" "Vérification du Serveur & Bridge Natif (Node.js <-> C++)" "$LOG_DIR/step5_server.log" step5_server
 
-# --- ÉTAPE 5 : Interface Web (React + TS + Vite) ---
-step5_web() {
+# --- ÉTAPE 6 : Interface Web (React + TS + Vite) ---
+step6_web() {
     npm run --workspace=web typecheck
     npm run --workspace=web build
 }
-run_step "[5/6]" "Vérification du Frontend Web (React & TypeScript)" "$LOG_DIR/step5_web.log" step5_web
+run_step "[6/7]" "Vérification du Frontend Web (React & TypeScript)" "$LOG_DIR/step6_web.log" step6_web
 
-# --- ÉTAPE 6 : Intégrité du Harness & Mémoire ---
+# --- ÉTAPE 7 : Intégrité du Harness & Mémoire ---
 REQUIRED_FILES=(
     "README.md"
     "AGENTS.md"
@@ -128,10 +134,11 @@ REQUIRED_FILES=(
     "examples/onyx/value.hpp"
     "examples/onyx/runtime.hpp"
     "examples/test_onyx.cpp"
+    "examples/onyx/fuzz_onyx.cpp"
     "docs/references/README.md"
 )
 
-step6_harness() {
+step7_harness() {
     local harness_ok=true
     for f in "${REQUIRED_FILES[@]}"; do
         if [ ! -f "$f" ]; then
@@ -145,7 +152,7 @@ step6_harness() {
     echo "  ✓ Tous les fichiers requis du Harness sont présents."
     return 0
 }
-run_step "[6/6]" "Vérification de l'intégrité du Harness et Mémoire" "$LOG_DIR/step6_harness.log" step6_harness
+run_step "[7/7]" "Vérification de l'intégrité du Harness et Mémoire" "$LOG_DIR/step7_harness.log" step7_harness
 
 # --- VERDICT FINAL ---
 echo -e "\n${BLUE}====================================================${NC}"

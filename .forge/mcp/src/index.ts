@@ -8,6 +8,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import fs from "node:fs/promises";
 import path from "node:path";
+import os from "node:os";
 import { fileURLToPath } from "node:url";
 
 const execFileAsync = promisify(execFile);
@@ -18,13 +19,17 @@ const __dirname = path.dirname(__filename);
 // Chemin racine du Hub de la Forge
 const FORGE_HUB_DIR = path.resolve(process.env.FORGE_HUB_DIR || path.resolve(__dirname, "../../.."));
 
+// Répertoire temporaire dédié et restreint (pas de /tmp global ouvert)
+const FORGE_TMP_SANDBOX = path.join(os.tmpdir(), "forge_sandbox");
+
 // Racines autorisées pour la restriction de chemins (sécurité stricte anti-traversal)
-const HOME_DIR = process.env.HOME || "/home/samuelyevi";
+// Aucun chemin utilisateur en dur : résolution dynamique via os.homedir()
+const HOME_DIR = os.homedir();
 const ALLOWED_ROOTS = [
   FORGE_HUB_DIR,
   path.resolve(HOME_DIR, "dev"),
   path.resolve("/mnt/dev"),
-  path.resolve("/tmp"),
+  FORGE_TMP_SANDBOX,
 ];
 
 /**
@@ -65,7 +70,7 @@ const ALLOWED_STANDARDS = new Set(["c++20", "c++23", "c++17", "c23", "c17", "c11
 const server = new Server(
   {
     name: "forge-global-hub",
-    version: "1.1.0",
+    version: "1.2.0",
   },
   {
     capabilities: {
@@ -165,13 +170,13 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       const results: string[] = [];
 
-      // A. Recherche dans le Dragon Book via query_book.py avec execFile (aucun shell)
+      // A. Recherche dans le Dragon Book via query_book.py avec argument --search=query
       if (category === "compilers" || category === "dragon_book" || category === "all") {
         try {
           const scriptPath = path.join(FORGE_HUB_DIR, "scripts/query_book.py");
           const { stdout } = await execFileAsync(
             "python3",
-            [scriptPath, "--book", "dragon", "--search", query],
+            [scriptPath, "--book", "dragon", `--search=${query}`],
             {
               cwd: FORGE_HUB_DIR,
               timeout: 20_000,
@@ -185,12 +190,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         }
       }
 
-      // B. Recherche textuelle dans .harness/knowledge avec execFile grep direct
+      // B. Recherche textuelle dans .harness/knowledge avec -e <query> et -- <dir>
       const knowledgeDir = path.join(FORGE_HUB_DIR, ".harness/knowledge");
       try {
         const { stdout } = await execFileAsync(
           "grep",
-          ["-rnI", "-i", "--max-count=3", query, knowledgeDir],
+          ["-rnI", "-i", "--max-count=3", "-e", query, "--", knowledgeDir],
           {
             timeout: 10_000,
             maxBuffer: EXEC_OPTIONS.maxBuffer,
@@ -278,7 +283,7 @@ Ce dépôt est gouverné par les principes de la **Forge Agentique**. Tout agent
 - Tout bloc \`unsafe\` doit comporter un commentaire \`// SAFETY:\` détaillant les invariants.`;
       } else if (projectType === "cpp" || projectType === "c") {
         conventionsBody = `## Invariants C / C++
-- Compilation stricte : \`-Wall -Wextra -Wpedantic -Werror\`.
+- Compilation stricte : \`-Wall -Wextra -Wpedantic -Werror -Wconversion\`.
 - AddressSanitizer obligatoire : \`-fsanitize=address,undefined\`.
 - Zéro fuite mémoire tolérée à l'exécution.`;
       } else if (projectType === "typescript") {
@@ -357,7 +362,7 @@ Ce document consigne chronologiquement les décisions prises par les agents et l
       };
     }
 
-    // 4. Audit Mémoire ASan avec execFile (aucun shell) et restriction de racine
+    // 4. Audit Mémoire ASan avec execFile (aucun shell), sandbox restreinte
     if (name === "forge_audit_memory") {
       const rawSource = String(args?.["sourcePath"] ?? "");
       const resolvedSource = validatePathUnderAllowedRoots(rawSource, "sourcePath");
@@ -374,15 +379,18 @@ Ce document consigne chronologiquement les décisions prises par les agents et l
         throw new Error(`Standard de compilation non autorisé : '${standard}'. Autorisés: ${Array.from(ALLOWED_STANDARDS).join(", ")}`);
       }
 
+      await fs.mkdir(FORGE_TMP_SANDBOX, { recursive: true });
       const uniqueSuffix = `${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
-      const tempBin = `/tmp/forge_asan_${uniqueSuffix}`;
+      const tempBin = path.join(FORGE_TMP_SANDBOX, `forge_asan_${uniqueSuffix}`);
       const compiler = isC ? "clang" : "clang++";
 
       const compileArgs = [
         `-std=${standard}`,
         "-Wall",
         "-Wextra",
+        "-Wpedantic",
         "-Werror",
+        "-Wconversion",
         "-fsanitize=address,undefined",
         "-I",
         path.join(FORGE_HUB_DIR, "native/include"),
@@ -457,9 +465,10 @@ Ce document consigne chronologiquement les décisions prises par les agents et l
 });
 
 async function main() {
+  await fs.mkdir(FORGE_TMP_SANDBOX, { recursive: true });
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  console.error(`Serveur MCP Global Forge v1.1.0 démarré (Hub: ${FORGE_HUB_DIR}).`);
+  console.error(`Serveur MCP Global Forge v1.2.0 démarré (Hub: ${FORGE_HUB_DIR}, Sandbox: ${FORGE_TMP_SANDBOX}).`);
 }
 
 main().catch((err) => {

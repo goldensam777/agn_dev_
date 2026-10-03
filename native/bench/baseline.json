@@ -1,0 +1,9 @@
+{
+  "benchmark": "dot_product",
+  "metric": "mops",
+  "baseline_value": 600.0,
+  "unit": "Millions d'opérations/sec",
+  "max_regression_percent": 5.0,
+  "runs": 3,
+  "description": "Banc de performance Mercuria dot_product (N = 10,000,000 éléments)"
+}

@@ -124,7 +124,8 @@ private:
 
         strides.back() = 1;
         for (int i = static_cast<int>(shape.size()) - 2; i >= 0; --i) {
-            strides[i] = strides[i + 1] * shape[i + 1];
+            size_t idx = static_cast<size_t>(i);
+            strides[idx] = strides[idx + 1] * shape[idx + 1];
         }
     }
 };

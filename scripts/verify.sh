@@ -13,50 +13,68 @@ NC='\033[0m'
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
+LOG_DIR="${ROOT_DIR}/build/verify_logs"
+mkdir -p "$LOG_DIR"
+
 echo -e "${BLUE}====================================================${NC}"
 echo -e "${BLUE}          FORGE AGENTIQUE — CONTRÔLE DE QUALITÉ     ${NC}"
 echo -e "${BLUE}====================================================${NC}"
 
 FAILURES=0
 
-# --- ÉTAPE 1 : Moteur Natif (C++ & AddressSanitizer) ---
-echo -e "\n${YELLOW}[1/5] Vérification du Moteur Natif C++ (ASan & Bench)...${NC}"
-if make -f native/Makefile clean > /dev/null 2>&1 && make -f native/Makefile; then
-    echo -e "${GREEN}  ✓ C++ : 0 warning, 0 fuite mémoire, tests validés sous AddressSanitizer.${NC}"
-else
-    echo -e "${RED}  ✗ ÉCHEC : Le moteur C++ a des warnings ou des fuites mémoire.${NC}"
-    FAILURES=$((FAILURES + 1))
-fi
+run_step() {
+    local step_tag="$1"
+    local step_title="$2"
+    local log_file="$3"
+    shift 3
 
-# --- ÉTAPE 2 : Frontière Contracts (Validation Zod & TypeScript) ---
-echo -e "\n${YELLOW}[2/5] Vérification de la frontière contracts/ (Zod)...${NC}"
-if npm run --workspace=contracts build > /dev/null 2>&1; then
-    echo -e "${GREEN}  ✓ Contracts : Typage TypeScript strict et schémas Zod compilés.${NC}"
-else
-    echo -e "${RED}  ✗ ÉCHEC : Erreur de typage dans contracts/schemas.ts.${NC}"
-    FAILURES=$((FAILURES + 1))
-fi
+    echo -e "\n${YELLOW}${step_tag} ${step_title}...${NC}"
+    mkdir -p "$(dirname "$log_file")"
+    if "$@" > "$log_file" 2>&1; then
+        echo -e "${GREEN}  ✓ Succès : ${step_title}.${NC}"
+    else
+        echo -e "${RED}  ✗ ÉCHEC : ${step_title} (Consultez ${log_file})${NC}"
+        echo -e "${RED}--- 30 dernières lignes de $(basename "$log_file") ---${NC}"
+        tail -n 30 "$log_file" || true
+        echo -e "${RED}--- Fin du journal d'erreur ---${NC}"
+        FAILURES=$((FAILURES + 1))
+    fi
+}
 
-# --- ÉTAPE 3 : Serveur & Pont Natif (Integration Tests) ---
-echo -e "\n${YELLOW}[3/5] Vérification du Serveur & Bridge Natif (Node.js <-> C++)...${NC}"
-if npm run --workspace=server test > /dev/null 2>&1 && npm run --workspace=server build > /dev/null 2>&1; then
-    echo -e "${GREEN}  ✓ Serveur : Bridge natif et tests d'intégration validés.${NC}"
-else
-    echo -e "${RED}  ✗ ÉCHEC : Erreur dans le bridge natif ou les routes serveur.${NC}"
-    FAILURES=$((FAILURES + 1))
-fi
+# --- ÉTAPE 1 : Moteur Natif C++ (ASan & Moteur Onyx) ---
+step1_native() {
+    make -f native/Makefile clean
+    make -f native/Makefile
+}
+run_step "[1/6]" "Vérification du Moteur Natif C++ (ASan & Moteur Onyx)" "$LOG_DIR/step1_native.log" step1_native
 
-# --- ÉTAPE 4 : Interface Web (React + TS + Vite) ---
-echo -e "\n${YELLOW}[4/5] Vérification du Frontend Web (React & TypeScript)...${NC}"
-if npm run --workspace=web typecheck > /dev/null 2>&1 && npm run --workspace=web build > /dev/null 2>&1; then
-    echo -e "${GREEN}  ✓ Web : Typage strict React et build Vite réussis.${NC}"
-else
-    echo -e "${RED}  ✗ ÉCHEC : Erreur de compilation dans l'interface web.${NC}"
-    FAILURES=$((FAILURES + 1))
-fi
+# --- ÉTAPE 2 : Non-Régression du Banc de Mesure (Médiane vs Baseline 5%) ---
+step2_bench() {
+    python3 scripts/compare_bench.py --baseline native/bench/baseline.json --bin bin/bench_math_core --runs 3 --threshold 5.0
+}
+run_step "[2/6]" "Comparaison du Banc à baseline.json (Médiane de 3 runs, seuil 5%)" "$LOG_DIR/step2_bench.log" step2_bench
 
-# --- ÉTAPE 5 : Intégrité du Harness & Mémoire ---
-echo -e "\n${YELLOW}[5/5] Vérification de l'intégrité du Harness...${NC}"
+# --- ÉTAPE 3 : Frontière Contracts (Validation Zod & TypeScript) ---
+step3_contracts() {
+    npm run --workspace=contracts build
+}
+run_step "[3/6]" "Vérification de la frontière contracts/ (Zod & TypeScript)" "$LOG_DIR/step3_contracts.log" step3_contracts
+
+# --- ÉTAPE 4 : Serveur & Pont Natif (Integration Tests) ---
+step4_server() {
+    npm run --workspace=server test
+    npm run --workspace=server build
+}
+run_step "[4/6]" "Vérification du Serveur & Bridge Natif (Node.js <-> C++)" "$LOG_DIR/step4_server.log" step4_server
+
+# --- ÉTAPE 5 : Interface Web (React + TS + Vite) ---
+step5_web() {
+    npm run --workspace=web typecheck
+    npm run --workspace=web build
+}
+run_step "[5/6]" "Vérification du Frontend Web (React & TypeScript)" "$LOG_DIR/step5_web.log" step5_web
+
+# --- ÉTAPE 6 : Intégrité du Harness & Mémoire ---
 REQUIRED_FILES=(
     "README.md"
     "AGENTS.md"
@@ -66,6 +84,9 @@ REQUIRED_FILES=(
     ".harness/knowledge/domain/guide_injection_domaine.md"
     ".harness/playbooks/add-native-module.md"
     ".harness/playbooks/add-endpoint.md"
+    ".harness/playbooks/init-language-corpus.md"
+    ".harness/playbooks/onboard-external-repo.md"
+    ".harness/playbooks/add-language-from-spec.md"
     ".harness/examples/canonical_vector_core.cpp"
     ".harness/examples/canonical_pratt_parser_arena.cpp"
     ".harness/examples/canonical_kahan_summation.cpp"
@@ -80,6 +101,10 @@ REQUIRED_FILES=(
     ".github/workflows/ci.yml"
     "contracts/schemas.ts"
     "native/Makefile"
+    "native/bench/baseline.json"
+    "scripts/compare_bench.py"
+    "scripts/forge_init.sh"
+    "scripts/query_book.py"
     "server/src/bridge/native_bridge.ts"
     "web/src/App.tsx"
     "web/src/pages/DashboardPage.tsx"
@@ -94,34 +119,33 @@ REQUIRED_FILES=(
     ".harness/knowledge/languages/python/README.md"
     ".harness/knowledge/domain/compilers/README.md"
     ".harness/knowledge/domain/DOCUMENTATIONS.md"
-    "native/onyx/arena.hpp"
-    "native/onyx/token.hpp"
-    "native/onyx/lexer.hpp"
-    "native/onyx/ast.hpp"
-    "native/onyx/parser.hpp"
-    "native/onyx/linear_check.hpp"
-    "native/onyx/value.hpp"
-    "native/onyx/runtime.hpp"
-    "native/tests/test_onyx.cpp"
-    ".harness/playbooks/init-language-corpus.md"
-    ".harness/playbooks/onboard-external-repo.md"
+    "examples/onyx/arena.hpp"
+    "examples/onyx/token.hpp"
+    "examples/onyx/lexer.hpp"
+    "examples/onyx/ast.hpp"
+    "examples/onyx/parser.hpp"
+    "examples/onyx/linear_check.hpp"
+    "examples/onyx/value.hpp"
+    "examples/onyx/runtime.hpp"
+    "examples/test_onyx.cpp"
     "docs/references/README.md"
-    "scripts/query_book.py"
-    "scripts/forge_init.sh"
 )
 
-HARNESS_OK=true
-for f in "${REQUIRED_FILES[@]}"; do
-    if [ ! -f "$f" ]; then
-        echo -e "${RED}  ✗ Fichier requis manquant : $f${NC}"
-        HARNESS_OK=false
-        FAILURES=$((FAILURES + 1))
+step6_harness() {
+    local harness_ok=true
+    for f in "${REQUIRED_FILES[@]}"; do
+        if [ ! -f "$f" ]; then
+            echo "  ✗ Fichier requis manquant : $f"
+            harness_ok=false
+        fi
+    done
+    if [ "$harness_ok" = false ]; then
+        return 1
     fi
-done
-
-if [ "$HARNESS_OK" = true ]; then
-    echo -e "${GREEN}  ✓ Harness complet : tous les guides, contrats et composants sont présents.${NC}"
-fi
+    echo "  ✓ Tous les fichiers requis du Harness sont présents."
+    return 0
+}
+run_step "[6/6]" "Vérification de l'intégrité du Harness et Mémoire" "$LOG_DIR/step6_harness.log" step6_harness
 
 # --- VERDICT FINAL ---
 echo -e "\n${BLUE}====================================================${NC}"

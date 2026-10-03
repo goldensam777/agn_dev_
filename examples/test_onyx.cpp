@@ -1,8 +1,8 @@
-#include "../onyx/arena.hpp"
-#include "../onyx/lexer.hpp"
-#include "../onyx/parser.hpp"
-#include "../onyx/linear_check.hpp"
-#include "../onyx/runtime.hpp"
+#include "onyx/arena.hpp"
+#include "onyx/lexer.hpp"
+#include "onyx/parser.hpp"
+#include "onyx/linear_check.hpp"
+#include "onyx/runtime.hpp"
 #include <cassert>
 #include <iostream>
 #include <cmath>

@@ -19,10 +19,10 @@ Toute implémentation de langage menée par un agent d'IA doit reposer sur les q
 - **Traçabilité des versions :** Tout changement de la spécification entraîne un nouveau numéro de version du corpus de référence.
 
 ### Pilier 3 : Le Fuzzing (Double Fuzzing : Sanity Minimal & Couverture LLVM)
-- **Seuil minimal aléatoire (5000 itérations) :** Le parseur et le lexer doivent être soumis à une campagne de robustesse minimale de **5000 itérations aléatoires** via le moteur modulaire [`native/include/forge/fuzz_engine.hpp`](../../native/include/forge/fuzz_engine.hpp) pour détecter les avortements immédiats et les désynchronisations de pile.
+- **Seuil minimal aléatoire (5000 itérations) :** Le parseur et le lexer doivent être soumis à une campagne de robustesse minimale de **5000 itérations aléatoires** (injection de bruit, tokens adversariaux, désynchronisations d'indentation) pour certifier l'absence d'avortement sauvage.
 - **Fuzzing guidé par la couverture (LLVM libFuzzer) :** Pour une assurance industrielle complète, le compilateur doit intégrer un harnais libFuzzer (`-fsanitize=fuzzer,address,undefined`) instrumentant la couverture de branches, transitions de graphe de contrôle et exploration d'arbres syntaxiques profonds.
 - **Audit Sanitizers (ASan + UBsan) :** Tout programme soumis au fuzzer, qu'il soit syntaxiquement valide ou rejeté avec une erreur, doit s'exécuter avec **0 fuite mémoire** et **0 comportement indéfini**.
-- **Intégration au Juge :** La campagne de fuzzing est une étape bloquante intégrée dans `scripts/verify.sh`.
+- **Intégration au Juge :** Dans le projet du langage, la campagne de fuzzing constitue une étape bloquante intégrée au script `scripts/verify.sh`.
 
 ### Pilier 4 : L'Aller-Retour (Round-Trip Verification)
 - **Boucle fermée de cohérence :**
@@ -79,15 +79,21 @@ flowchart TD
 2. Détecter et rejeter à la compilation toute violation d'invariant définie dans la spécification.
 
 ### Étape 5 : Campagnes de Fuzzing & Juge Souverain
-1. Brancher la cible sur le moteur générique de la Forge ([`native/include/forge/fuzz_engine.hpp`](../../native/include/forge/fuzz_engine.hpp)).
+1. Brancher la cible sur un générateur d'échantillons aléatoires et adversariaux.
 2. Exécuter un **seuil minimal de 5000 itérations aléatoires** sous ASan/UBsan pour certifier la robustesse initiale.
-3. Fournir le point d'entrée pour **LLVM libFuzzer** (`FORGE_DEFINE_LIBFUZZER_TARGET`) pour l'exploration par couverture de code.
-4. Intégrer la cible dans `native/Makefile` et dans le juge unique `scripts/verify.sh`.
+3. Fournir le point d'entrée pour **LLVM libFuzzer** (`-fsanitize=fuzzer,address,undefined`) pour l'exploration par couverture de code.
+4. Intégrer la cible dans le Makefile et dans le juge `scripts/verify.sh` du projet.
 
 ---
 
-## 3. Références et Implémentation Exemple
+## 3. Déploiement Externe via le Forge Hub
 
-Pour examiner une application concrète de ce protocole sur un langage système complet sans Garbage Collector :
-- **Étude de cas Onyx :** Voir [`examples/onyx/README.md`](../../examples/onyx/README.md) détaillant l'arène contiguë RAII, le lexer à pile d'indentation, le parseur Pratt 10 niveaux, le typage linéaire sans GC, et le double fuzzing (5000 itérations + libFuzzer).
-- **Moteur générique de Fuzzing :** [`native/include/forge/fuzz_engine.hpp`](../../native/include/forge/fuzz_engine.hpp).
+Tout nouveau langage conçu à partir d'une spécification est développé **en dehors du dépôt central de la Forge**, dans un environnement autonome initialisé via le Hub :
+
+1. **Scaffolding du projet :** Utiliser l'outil MCP `forge_scaffold_harness` avec le type `cpp` ou `rust`.
+2. **Consultation des modèles canoniques :** Interroger `forge_get_canonical_example` pour instancier :
+   - Le parseur Pratt avec arène mémoire : [`canonical_pratt_parser_arena.cpp`](../examples/canonical_pratt_parser_arena.cpp).
+   - Le lexer vectoriel et tokenisation Pratt : [`canonical_lexer_pratt.rs`](../examples/canonical_lexer_pratt.rs).
+   - L'allocateur d'arène C23 : [`canonical_arena_c23.c`](../examples/canonical_arena_c23.c).
+3. **Théorie des compilateurs :** Utiliser `forge_query_knowledge` (requêtes Dragon Book, SSA, automates, régie mémoire sans GC).
+4. **Vérification autonome :** Chaque projet externe possède son propre juge `scripts/verify.sh` assurant le verdict PASS sans fuite.

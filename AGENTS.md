@@ -125,19 +125,14 @@ agn_dev_/
   - [x] Corpus transverse dans `.harness/knowledge/domain/fullstack/` (mesure, KPIs, Web Vitals, p99, architecture stateless, observabilité RED/USE, conteneurs durcis).
   - [x] Corpus transverse dans `.harness/knowledge/domain/scientific/` (reproductibilité déterministe, sécurité frontière NaN/Inf, tolérances, orchestration asynchrone).
 - [ ] **Étape 5 : Ingénierie de Langages (Compilateurs, Interpréteurs & LLVM)**
-  - [x] Spécification formelle du langage système **Onyx** (`.harness/knowledge/domain/DOCUMENTATIONS.md`) : syntaxe par indentation, typage linéaire zéro-GC, promotion numérique, algèbre des quaternions et tenseurs multidimensionnels contigus.
-  - [x] Moteur et compilateur natif C++20 sans Garbage Collector (`examples/onyx/`) :
-    - Allocateur d'arène contigu (`Arena`) avec suivi déterministe des destructeurs non-triviaux (zéro fuite sous ASan).
-    - Lexer à pile d'indentation indent/dedent et commentaires `(< ... >)`.
-    - Parseur Pratt 10 niveaux de priorité avec associativité à droite de la puissance `^`.
-    - Analyseur statique de consommation linéaire compile-time (`LinearChecker` détectant le use-after-consume sans GC).
-    - Runtime d'exécution sans GC supportant nombres complexes, quaternions non-commutatifs et tenseurs contigus.
-    - 8 bancs d'essai complets (`examples/test_onyx.cpp`) intégrés à `native/Makefile` et `scripts/verify.sh` sous ASan.
+  - [x] Architecture du Hub de production externe : tout compilateur, parseur et bancs de tests associés sont générés et testés en dehors du dépôt via le Forge Hub (`forge-hub` MCP, `forge_scaffold_harness`).
+  - [x] Modèles canoniques de compilateurs dans `.harness/examples/` : parseur Pratt avec arène (`canonical_pratt_parser_arena.cpp`), lexer Pratt Rust (`canonical_lexer_pratt.rs`), arène C23 (`canonical_arena_c23.c`).
+  - [x] Playbook universel de spécification de langage : [`.harness/playbooks/add-language-from-spec.md`](.harness/playbooks/add-language-from-spec.md) (les 4 piliers, porte humaine, 5000 iters fuzzing, round-trip).
   - [x] Module natif Rust de référence `forge-math-core` (`native/rust/`) conforme à la politique Rust-first :
     - Implémentation vectorisée sans code unsafe (`#![deny(unsafe_code)]`, `#![deny(missing_docs)]`).
     - Produit scalaire SIMD, Monte Carlo Pi déterministe et multiplication matricielle cache-friendly $i-k-j$.
     - Étape 2 dédiée dans `scripts/verify.sh` : `cargo fmt --check`, `cargo clippy -- -D warnings`, `cargo test` avec fallback `NON EXÉCUTÉ`.
   - [x] Protocole de banc de mesure renforcé (1 passe de chauffe uncounted + 10 exécutions statistiques, détection d'état d'alimentation secteur/batterie).
-  - [ ] Génération de code intermédiaire LLVM IR.
+  - [ ] Génération de code intermédiaire LLVM IR dans un module dédié externe.
   - [ ] Bancs de mesure comparatifs multi-langages.
 

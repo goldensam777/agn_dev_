@@ -55,6 +55,22 @@ def is_on_ac_power() -> tuple[bool, str]:
         pass
     return False, "Sur batterie (secteur déconnecté)"
 
+def is_cpu_throttled() -> tuple[bool, str]:
+    """Détecte si le processeur est bridé par le gestionnaire d'alimentation (mode économie/batterie faible)."""
+    try:
+        no_turbo = Path("/sys/devices/system/cpu/intel_pstate/no_turbo")
+        if no_turbo.exists() and no_turbo.read_text().strip() == "1":
+            return True, "Mode économie d'énergie actif (no_turbo=1, fréquence CPU bridée)"
+
+        scaling_max = Path("/sys/devices/system/cpu/cpu0/cpufreq/scaling_max_freq")
+        if scaling_max.exists():
+            freq_khz = int(scaling_max.read_text().strip())
+            if freq_khz < 2_000_000:
+                return True, f"Fréquence maximale bridée ({freq_khz / 1000:.0f} MHz < 2.0 GHz)"
+    except Exception:
+        pass
+    return False, "Nominal"
+
 def run_benchmark(bin_path: Path, runs: int, warmup: int = 1) -> list[float]:
     pattern = re.compile(r"Débit\s*:\s*([0-9.]+)\s*Millions", re.IGNORECASE)
 
@@ -138,14 +154,33 @@ def main() -> int:
         print("====================================================")
         return 0
 
+    is_throttled, throttle_reason = is_cpu_throttled()
+    baseline_val = float(baseline_data.get("baseline_value", 1000.0))
+    ref_throttled = bool(baseline_data.get("reference_machine", {}).get("throttled", False))
+
+    if not args.update and is_throttled and not ref_throttled:
+        print("====================================================")
+        print("⚠ AVERTISSEMENT : BANC NON COMPARABLE")
+        print(f"Machine actuelle     : {current_cpu} ({platform.system()} {platform.machine()})")
+        print(f"État processeur      : {throttle_reason}")
+        print(f"Machine de référence : {ref_cpu} (Profil nominal {baseline_val:.2f} Mops/s)")
+        print("\nLe processeur est actuellement bridé par le gestionnaire d'énergie (mode économie/batterie basse).")
+        print("Une comparaison de débit avec la référence nominale n'est pas représentative tant que l'alimentation")
+        print("secteur n'est pas branchée ou que le profil nominal de performance n'est pas restauré.")
+        print("\nPour forcer une baseline dédiée à ce mode d'économie d'énergie :")
+        print(f"  python3 scripts/compare_bench.py --update --runs 10 --warmup 1")
+        print("====================================================")
+        return 0
+
     runs = int(args.runs if args.runs is not None else baseline_data.get("runs", 5))
     threshold_pct = float(args.threshold if args.threshold is not None else baseline_data.get("max_regression_percent", 5.0))
-    baseline_val = float(baseline_data.get("baseline_value", 1000.0))
     on_ac, power_info = is_on_ac_power()
 
     print(f"=== COMPARAISON DU BANC DE PERFORMANCE ({baseline_data.get('benchmark', 'dot_product')}) ===")
     print(f"Machine actuelle : {current_cpu} ({platform.system()} {platform.machine()})")
     print(f"Alimentation     : {power_info}")
+    if is_throttled:
+        print(f"Régime CPU       : {throttle_reason}")
     print(f"Référence active : {baseline_val:.2f} Mops/s ({active_baseline_path})")
     print(f"Seuil tolérance  : {threshold_pct:.2f} %")
     print(f"Itérations       : {runs} (après {args.warmup} chauffe(s))")
@@ -179,6 +214,8 @@ def main() -> int:
                 "os": platform.platform(),
                 "architecture": platform.machine(),
                 "power_state": "ac_mains" if on_ac else "battery",
+                "throttled": is_throttled,
+                "throttle_reason": throttle_reason,
             },
             "last_updated": datetime.datetime.now().isoformat(),
             "description": "Banc de performance Mercuria dot_product (N = 10,000,000 éléments)",

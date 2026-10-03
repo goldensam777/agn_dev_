@@ -53,12 +53,12 @@ run_step() {
     fi
 }
 
-# --- ÉTAPE 1 : Moteur Natif C++ (ASan & Moteur Onyx) ---
+# --- ÉTAPE 1 : Moteur Natif C++ (ASan & UBsan) ---
 step1_native() {
     make -f native/Makefile clean
     make -f native/Makefile
 }
-run_step "[1/9]" "Vérification du Moteur Natif C++ (ASan & Moteur Onyx)" "$LOG_DIR/step1_native.log" step1_native
+run_step "[1/7]" "Vérification du Moteur Natif C++ (ASan & UBsan)" "$LOG_DIR/step1_native.log" step1_native
 
 # --- ÉTAPE 2 : Modules Natifs Rust (fmt, clippy, tests) ---
 step2_rust() {
@@ -70,41 +70,35 @@ step2_rust() {
     cargo clippy -- -D warnings
     cargo test
 }
-run_step "[2/9]" "Vérification des Modules Rust (fmt, clippy, tests)" "$LOG_DIR/step2_rust.log" step2_rust
+run_step "[2/7]" "Vérification des Modules Rust (fmt, clippy, tests)" "$LOG_DIR/step2_rust.log" step2_rust
 
-# --- ÉTAPE 3 : Fuzzing Syntaxique & Mémoire sous ASan/UBsan (Pilier 3) ---
-step3_fuzz() {
-    make -f native/Makefile fuzz
-}
-run_step "[3/9]" "Campagne de Fuzzing Syntaxique & Mémoire (5000 itérations ASan/UBsan)" "$LOG_DIR/step3_fuzz.log" step3_fuzz
-
-# --- ÉTAPE 4 : Non-Régression du Banc de Mesure (Médiane vs Seuil de référence) ---
-step4_bench() {
+# --- ÉTAPE 3 : Non-Régression du Banc de Mesure (Médiane vs Seuil de référence) ---
+step3_bench() {
     python3 scripts/compare_bench.py --baseline native/bench/baseline.json --bin bin/bench_math_core --runs 3
 }
-run_step "[4/9]" "Comparaison du Banc à baseline.json (Médiane de 3 runs, seuil de référence)" "$LOG_DIR/step4_bench.log" step4_bench
+run_step "[3/7]" "Comparaison du Banc à baseline.json (Médiane de 3 runs, seuil de référence)" "$LOG_DIR/step3_bench.log" step3_bench
 
-# --- ÉTAPE 5 : Frontière Contracts (Validation Zod & TypeScript) ---
-step5_contracts() {
+# --- ÉTAPE 4 : Frontière Contracts (Validation Zod & TypeScript) ---
+step4_contracts() {
     npm run --workspace=contracts build
 }
-run_step "[5/9]" "Vérification de la frontière contracts/ (Zod & TypeScript)" "$LOG_DIR/step5_contracts.log" step5_contracts
+run_step "[4/7]" "Vérification de la frontière contracts/ (Zod & TypeScript)" "$LOG_DIR/step4_contracts.log" step4_contracts
 
-# --- ÉTAPE 6 : Serveur & Pont Natif (Integration Tests) ---
-step6_server() {
+# --- ÉTAPE 5 : Serveur & Pont Natif (Integration Tests) ---
+step5_server() {
     npm run --workspace=server test
     npm run --workspace=server build
 }
-run_step "[6/9]" "Vérification du Serveur & Bridge Natif (Node.js <-> C++)" "$LOG_DIR/step6_server.log" step6_server
+run_step "[5/7]" "Vérification du Serveur & Bridge Natif (Node.js <-> C++)" "$LOG_DIR/step5_server.log" step5_server
 
-# --- ÉTAPE 7 : Interface Web (React + TS + Vite) ---
-step7_web() {
+# --- ÉTAPE 6 : Interface Web (React + TS + Vite) ---
+step6_web() {
     npm run --workspace=web typecheck
     npm run --workspace=web build
 }
-run_step "[7/9]" "Vérification du Frontend Web (React & TypeScript)" "$LOG_DIR/step7_web.log" step7_web
+run_step "[6/7]" "Vérification du Frontend Web (React & TypeScript)" "$LOG_DIR/step6_web.log" step6_web
 
-# --- ÉTAPE 8 : Intégrité du Harness & Mémoire ---
+# --- ÉTAPE 7 : Intégrité du Harness & Mémoire ---
 REQUIRED_FILES=(
     "README.md"
     "AGENTS.md"
@@ -132,6 +126,9 @@ REQUIRED_FILES=(
     "contracts/schemas.ts"
     "native/Makefile"
     "native/bench/baseline.json"
+    "native/rust/Cargo.toml"
+    "native/rust/src/lib.rs"
+    "Cargo.toml"
     "scripts/compare_bench.py"
     "scripts/forge_init.sh"
     "scripts/query_book.py"
@@ -148,26 +145,10 @@ REQUIRED_FILES=(
     ".harness/knowledge/languages/js/README.md"
     ".harness/knowledge/languages/python/README.md"
     ".harness/knowledge/domain/compilers/README.md"
-    ".harness/knowledge/domain/DOCUMENTATIONS.md"
-    "examples/onyx/arena.hpp"
-    "examples/onyx/token.hpp"
-    "examples/onyx/lexer.hpp"
-    "examples/onyx/ast.hpp"
-    "examples/onyx/parser.hpp"
-    "examples/onyx/linear_check.hpp"
-    "examples/onyx/value.hpp"
-    "examples/onyx/runtime.hpp"
-    "examples/test_onyx.cpp"
-    "examples/onyx/fuzz_onyx.cpp"
-    "examples/onyx/README.md"
-    "native/include/forge/fuzz_engine.hpp"
-    "native/rust/Cargo.toml"
-    "native/rust/src/lib.rs"
-    "Cargo.toml"
     "docs/references/README.md"
 )
 
-step8_harness() {
+step7_harness() {
     local harness_ok=true
     for f in "${REQUIRED_FILES[@]}"; do
         if [ ! -f "$f" ]; then
@@ -181,17 +162,7 @@ step8_harness() {
     echo "  ✓ Tous les fichiers requis du Harness sont présents."
     return 0
 }
-run_step "[8/9]" "Vérification de l'intégrité du Harness et Mémoire" "$LOG_DIR/step8_harness.log" step8_harness
-
-# --- ÉTAPE 9 : Fuzzing guidé par la couverture via LLVM libFuzzer ---
-step9_libfuzzer() {
-    if ! command -v clang++ >/dev/null 2>&1; then
-        echo "NON EXÉCUTÉ : Clang/libFuzzer indisponible (clang++ introuvable)."
-        return 0
-    fi
-    make CXX=clang++ -f native/Makefile fuzz_coverage
-}
-run_step "[9/9]" "Fuzzing guidé par la couverture (LLVM libFuzzer)" "$LOG_DIR/step9_libfuzzer.log" step9_libfuzzer
+run_step "[7/7]" "Vérification de l'intégrité du Harness et Mémoire" "$LOG_DIR/step7_harness.log" step7_harness
 
 # --- VERDICT FINAL ---
 echo -e "\n${BLUE}====================================================${NC}"

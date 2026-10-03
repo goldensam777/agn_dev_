@@ -22,6 +22,7 @@ echo -e "${BLUE}====================================================${NC}"
 
 FAILURES=0
 WARNINGS=0
+SKIPPED=0
 
 run_step() {
     local step_tag="$1"
@@ -32,7 +33,11 @@ run_step() {
     echo -e "\n${YELLOW}${step_tag} ${step_title}...${NC}"
     mkdir -p "$(dirname "$log_file")"
     if "$@" > "$log_file" 2>&1; then
-        if grep -q "NON COMPARABLE" "$log_file"; then
+        if grep -q "NON EXÉCUTÉ" "$log_file"; then
+            echo -e "${YELLOW}  ⚠ NON EXÉCUTÉ : ${step_title}.${NC}"
+            grep -A 3 "NON EXÉCUTÉ" "$log_file" | sed 's/^/    /' || true
+            SKIPPED=$((SKIPPED + 1))
+        elif grep -q "NON COMPARABLE" "$log_file"; then
             echo -e "${YELLOW}  ⚠ AVERTISSEMENT : ${step_title} (Matériel différent, banc NON COMPARABLE).${NC}"
             grep -A 10 "NON COMPARABLE" "$log_file" | sed 's/^/    /' || true
             WARNINGS=$((WARNINGS + 1))
@@ -53,39 +58,39 @@ step1_native() {
     make -f native/Makefile clean
     make -f native/Makefile
 }
-run_step "[1/7]" "Vérification du Moteur Natif C++ (ASan & Moteur Onyx)" "$LOG_DIR/step1_native.log" step1_native
+run_step "[1/8]" "Vérification du Moteur Natif C++ (ASan & Moteur Onyx)" "$LOG_DIR/step1_native.log" step1_native
 
 # --- ÉTAPE 2 : Fuzzing Syntaxique & Mémoire sous ASan/UBsan (Pilier 3) ---
 step2_fuzz() {
     make -f native/Makefile fuzz
 }
-run_step "[2/7]" "Campagne de Fuzzing Syntaxique & Mémoire (5000 itérations ASan/UBsan)" "$LOG_DIR/step2_fuzz.log" step2_fuzz
+run_step "[2/8]" "Campagne de Fuzzing Syntaxique & Mémoire (5000 itérations ASan/UBsan)" "$LOG_DIR/step2_fuzz.log" step2_fuzz
 
-# --- ÉTAPE 3 : Non-Régression du Banc de Mesure (Médiane vs Baseline 5%) ---
+# --- ÉTAPE 3 : Non-Régression du Banc de Mesure (Médiane vs Seuil de référence) ---
 step3_bench() {
-    python3 scripts/compare_bench.py --baseline native/bench/baseline.json --bin bin/bench_math_core --runs 3 --threshold 5.0
+    python3 scripts/compare_bench.py --baseline native/bench/baseline.json --bin bin/bench_math_core --runs 3
 }
-run_step "[3/7]" "Comparaison du Banc à baseline.json (Médiane de 3 runs, seuil 5%)" "$LOG_DIR/step3_bench.log" step3_bench
+run_step "[3/8]" "Comparaison du Banc à baseline.json (Médiane de 3 runs, seuil de référence)" "$LOG_DIR/step3_bench.log" step3_bench
 
 # --- ÉTAPE 4 : Frontière Contracts (Validation Zod & TypeScript) ---
 step4_contracts() {
     npm run --workspace=contracts build
 }
-run_step "[4/7]" "Vérification de la frontière contracts/ (Zod & TypeScript)" "$LOG_DIR/step4_contracts.log" step4_contracts
+run_step "[4/8]" "Vérification de la frontière contracts/ (Zod & TypeScript)" "$LOG_DIR/step4_contracts.log" step4_contracts
 
 # --- ÉTAPE 5 : Serveur & Pont Natif (Integration Tests) ---
 step5_server() {
     npm run --workspace=server test
     npm run --workspace=server build
 }
-run_step "[5/7]" "Vérification du Serveur & Bridge Natif (Node.js <-> C++)" "$LOG_DIR/step5_server.log" step5_server
+run_step "[5/8]" "Vérification du Serveur & Bridge Natif (Node.js <-> C++)" "$LOG_DIR/step5_server.log" step5_server
 
 # --- ÉTAPE 6 : Interface Web (React + TS + Vite) ---
 step6_web() {
     npm run --workspace=web typecheck
     npm run --workspace=web build
 }
-run_step "[6/7]" "Vérification du Frontend Web (React & TypeScript)" "$LOG_DIR/step6_web.log" step6_web
+run_step "[6/8]" "Vérification du Frontend Web (React & TypeScript)" "$LOG_DIR/step6_web.log" step6_web
 
 # --- ÉTAPE 7 : Intégrité du Harness & Mémoire ---
 REQUIRED_FILES=(
@@ -161,13 +166,31 @@ step7_harness() {
     echo "  ✓ Tous les fichiers requis du Harness sont présents."
     return 0
 }
-run_step "[7/7]" "Vérification de l'intégrité du Harness et Mémoire" "$LOG_DIR/step7_harness.log" step7_harness
+run_step "[7/8]" "Vérification de l'intégrité du Harness et Mémoire" "$LOG_DIR/step7_harness.log" step7_harness
+
+# --- ÉTAPE 8 : Fuzzing guidé par la couverture via LLVM libFuzzer ---
+step8_libfuzzer() {
+    if ! command -v clang++ >/dev/null 2>&1; then
+        echo "NON EXÉCUTÉ : Clang/libFuzzer indisponible (clang++ introuvable)."
+        return 0
+    fi
+    make CXX=clang++ -f native/Makefile fuzz_coverage
+}
+run_step "[8/8]" "Fuzzing guidé par la couverture (LLVM libFuzzer)" "$LOG_DIR/step8_libfuzzer.log" step8_libfuzzer
 
 # --- VERDICT FINAL ---
 echo -e "\n${BLUE}====================================================${NC}"
 if [ $FAILURES -eq 0 ]; then
-    if [ $WARNINGS -gt 0 ]; then
-        echo -e "${YELLOW}  VERDICT : PASS (${WARNINGS} avertissement(s) non bloquant(s))${NC}"
+    if [ $WARNINGS -gt 0 ] || [ $SKIPPED -gt 0 ]; then
+        verdict_details=""
+        if [ $WARNINGS -gt 0 ]; then
+            verdict_details="${WARNINGS} avertissement(s) non bloquant(s)"
+        fi
+        if [ $SKIPPED -gt 0 ]; then
+            [ -n "$verdict_details" ] && verdict_details+=" ; "
+            verdict_details+="${SKIPPED} étape(s) NON EXÉCUTÉE(s)"
+        fi
+        echo -e "${YELLOW}  VERDICT : PASS (${verdict_details})${NC}"
     else
         echo -e "${GREEN}  VERDICT : PASS (Tous les critères de qualité sont satisfaits)${NC}"
     fi

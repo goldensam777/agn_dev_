@@ -50,6 +50,12 @@ def run_benchmark(bin_path: Path, runs: int) -> list[float]:
 
     return values
 
+def calculate_reference_threshold(measurements: list[float], baseline_value: float) -> tuple[float, float]:
+    """Calcule la dispersion de référence et le seuil de régression associé."""
+    stddev = statistics.stdev(measurements) if len(measurements) >= 2 else 0.0
+    dispersion_pct = (3.0 * stddev / baseline_value * 100.0) if baseline_value else 0.0
+    return stddev, max(5.0, dispersion_pct)
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Vérification de non-régression du banc de performance.")
     parser.add_argument("--baseline", type=Path, default=Path("native/bench/baseline.json"), help="Fichier JSON de référence par défaut")
@@ -126,12 +132,16 @@ def main() -> int:
     print(f"Médiane calculée : {med:.2f} Mops/s")
 
     if args.update:
+        reference_stddev, threshold_pct = calculate_reference_threshold(measurements, med)
+        print(f"Écart-type de référence : {reference_stddev:.2f} Mops/s")
+        print(f"Seuil calculé : max(5.0 %, 3 × écart-type / médiane) = {threshold_pct:.2f} %")
         new_data = {
             "benchmark": "dot_product",
             "metric": "mops",
             "baseline_value": round(med, 2),
             "unit": "Millions d'opérations/sec",
-            "max_regression_percent": threshold_pct,
+            "reference_stddev": round(reference_stddev, 2),
+            "max_regression_percent": round(threshold_pct, 2),
             "runs": runs,
             "reference_machine": {
                 "cpu": current_cpu,

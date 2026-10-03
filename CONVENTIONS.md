@@ -13,7 +13,30 @@ Ce fichier contient les règles non négociables appliquées à l'ensemble du co
 
 ---
 
-## 2. Règles par Langage
+## 2. Politique Rust-first pour les modules natifs
+
+Rust est le langage par défaut pour tout nouveau module natif ou toute nouvelle
+fonctionnalité système.
+
+Le C++ est autorisé uniquement lorsqu'une justification technique documentée
+existe, notamment :
+
+- une bibliothèque ou un SDK nécessaire n'a pas d'équivalent Rust viable ;
+- l'intégration directe d'une base de code C++ existante est requise ;
+- une contrainte d'ABI, de plateforme, de matériel ou d'outillage l'impose ;
+- une preuve reproductible montre que Rust ne satisfait pas les exigences de
+  performance ou d'intégration.
+
+Avant d'introduire du nouveau C++, il faut vérifier si la dépendance peut être
+encapsulée derrière une API C ou une frontière FFI stable, en conservant le
+nouveau code applicatif en Rust lorsque cela est possible.
+
+Toute exception doit être documentée dans un ADR ou dans la documentation du
+module, avec la dépendance concernée, la frontière FFI et la stratégie de test.
+
+---
+
+## 3. Règles par Langage
 
 ### C & C++ (`native/`)
 
@@ -49,14 +72,14 @@ Ce fichier contient les règles non négociables appliquées à l'ensemble du co
 
 ---
 
-## 3. Format des Commits & Documentation
+## 4. Format des Commits & Documentation
 
 - **Format des commits :** Conventional Commits obligatoire (`feat:`, `fix:`, `perf:`, `refactor:`, `test:`, `docs:`).
 - **Documentation du code :** Chaque structure de données, classe ou fonction publique doit être documentée (Doxygen pour C++, Rustdoc pour Rust, TSDoc pour TypeScript).
 
 ---
 
-## 4. Commande Unique de Vérification
+## 5. Commande Unique de Vérification
 
 Avant de valider ou soumettre toute modification, la commande suivante doit être exécutée avec succès :
 

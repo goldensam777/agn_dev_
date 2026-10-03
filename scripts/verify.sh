@@ -13,7 +13,7 @@ NC='\033[0m'
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
-LOG_DIR="${ROOT_DIR}/build/verify_logs"
+LOG_DIR="${ROOT_DIR}/.verify_logs"
 mkdir -p "$LOG_DIR"
 
 echo -e "${BLUE}====================================================${NC}"
@@ -21,6 +21,7 @@ echo -e "${BLUE}          FORGE AGENTIQUE — CONTRÔLE DE QUALITÉ     ${NC}"
 echo -e "${BLUE}====================================================${NC}"
 
 FAILURES=0
+WARNINGS=0
 
 run_step() {
     local step_tag="$1"
@@ -31,7 +32,13 @@ run_step() {
     echo -e "\n${YELLOW}${step_tag} ${step_title}...${NC}"
     mkdir -p "$(dirname "$log_file")"
     if "$@" > "$log_file" 2>&1; then
-        echo -e "${GREEN}  ✓ Succès : ${step_title}.${NC}"
+        if grep -q "NON COMPARABLE" "$log_file"; then
+            echo -e "${YELLOW}  ⚠ AVERTISSEMENT : ${step_title} (Matériel différent, banc NON COMPARABLE).${NC}"
+            grep -A 10 "NON COMPARABLE" "$log_file" | sed 's/^/    /' || true
+            WARNINGS=$((WARNINGS + 1))
+        else
+            echo -e "${GREEN}  ✓ Succès : ${step_title}.${NC}"
+        fi
     else
         echo -e "${RED}  ✗ ÉCHEC : ${step_title} (Consultez ${log_file})${NC}"
         echo -e "${RED}--- 30 dernières lignes de $(basename "$log_file") ---${NC}"
@@ -135,6 +142,8 @@ REQUIRED_FILES=(
     "examples/onyx/runtime.hpp"
     "examples/test_onyx.cpp"
     "examples/onyx/fuzz_onyx.cpp"
+    "examples/onyx/README.md"
+    "native/include/forge/fuzz_engine.hpp"
     "docs/references/README.md"
 )
 
@@ -157,7 +166,11 @@ run_step "[7/7]" "Vérification de l'intégrité du Harness et Mémoire" "$LOG_D
 # --- VERDICT FINAL ---
 echo -e "\n${BLUE}====================================================${NC}"
 if [ $FAILURES -eq 0 ]; then
-    echo -e "${GREEN}  VERDICT : PASS (Tous les critères de qualité sont satisfaits)${NC}"
+    if [ $WARNINGS -gt 0 ]; then
+        echo -e "${YELLOW}  VERDICT : PASS (${WARNINGS} avertissement(s) non bloquant(s))${NC}"
+    else
+        echo -e "${GREEN}  VERDICT : PASS (Tous les critères de qualité sont satisfaits)${NC}"
+    fi
     echo -e "${BLUE}====================================================${NC}"
     exit 0
 else

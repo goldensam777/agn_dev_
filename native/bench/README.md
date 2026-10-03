@@ -1,34 +1,33 @@
-# Protocole de Mesure & Baseline de Performance (Mercuria)
+# Protocole de Mesure & Baselines Multi-Machines (Mercuria)
 
-Ce répertoire contient le banc de mesure natif et sa référence statistique (*baseline*).
-
----
-
-## 1. Fichier de référence `baseline.json`
-
-Le fichier [`baseline.json`](./baseline.json) consigne les caractéristiques de la machine de référence et la valeur médiane de débit attendue :
-- **Métrique :** Millions d'opérations par seconde (`Mops/s`).
-- **Seuil de tolérance :** 5.0 % de régression maximale par rapport à la médiane.
-- **Machine de référence actuelle :** 11th Gen Intel(R) Core(TM) i7-1165G7 @ 2.80GHz, 8 cœurs, Fedora Linux.
+Ce répertoire contient le banc de mesure natif et ses références statistiques (*baselines*).
 
 ---
 
-## 2. Vérification de Non-Régression
+## 1. Architecture des Baselines Multi-Machines
 
-Le script [`scripts/compare_bench.py`](../../scripts/compare_bench.py) exécute 5 itérations du banc, calcule la médiane pour éliminer les anomalies d'ordonnancement CPU, et vérifie que :
-$$\text{Médiane mesurée} \ge \text{baseline\_value} \times (1 - 0.05)$$
+Les architectures matérielles étant hétérogènes (stations locales, serveurs de CI, VM cloud), une mesure de débit numérique ne peut être comparée qu'à une machine de caractéristiques équivalentes.
 
-Pour tester manuellement :
-```bash
-python3 scripts/compare_bench.py --runs 5
-```
+Le système organise les références par empreinte CPU dans [`native/bench/baselines/`](./baselines/) :
+- **Fichier canonique par défaut :** [`native/bench/baseline.json`](./baseline.json)
+- **Références dédiées par processeur :** `native/bench/baselines/<cpu_slug>.json`
+  - Exemple : [`native/bench/baselines/11th_gen_intel_r_core_tm_i7_1165g7_2_80ghz.json`](./baselines/11th_gen_intel_r_core_tm_i7_1165g7_2_80ghz.json)
 
 ---
 
-## 3. Procédure de Mise à Jour de la Baseline
+## 2. Comportement du Comparateur (`scripts/compare_bench.py`)
 
-Lors d'un changement de matériel ou d'une optimisation architecturale durable validée :
+Lors de l'exécution du juge souverain (`scripts/verify.sh` ou appel direct) :
+1. **Machine correspondante :** Si une baseline existe pour le CPU actuel dans `baselines/` ou dans `baseline.json`, le script vérifie la non-régression stricte :
+   $$\text{Médiane mesurée} \ge \text{baseline\_value} \times (1 - 0.05)$$
+2. **Machine différente (ex: CI GitHub Actions) :** Si la machine actuelle diffère de la référence enregistrée, le script affiche un avertissement visible **« NON COMPARABLE »**, affiche les deux processeurs en vis-à-vis, n'échoue pas arbitrairement, et invite à créer une référence dédiée via `--update`.
+
+---
+
+## 3. Procédure de Création / Mise à Jour d'une Référence
+
+Pour enregistrer ou actualiser la référence sur une machine donnée (5 itérations avec calcul de la médiane) :
 ```bash
 python3 scripts/compare_bench.py --update --runs 5
 ```
-Cette commande exécute le banc, recalcule la médiane, inspecte la machine hôte et met à jour `native/bench/baseline.json`.
+Cette commande génère automatiquement `native/bench/baselines/<cpu_slug>.json` avec les spécifications matérielles complètes et actualise `native/bench/baseline.json`.

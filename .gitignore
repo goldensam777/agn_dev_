@@ -30,3 +30,4 @@ docs/references/*.pdf
 
 #other
 story.txt
+.verify_logs/

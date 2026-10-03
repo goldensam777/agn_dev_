@@ -48,6 +48,14 @@ fuzz: $(BIN_DIR)/fuzz_onyx
 	@echo "--- Exécution de la campagne de Fuzzing sous AddressSanitizer ---"
 	./$(BIN_DIR)/fuzz_onyx --iterations 5000
 
+# Compilation et exécution du Fuzzing guidé par la couverture via libFuzzer (Clang)
+$(BIN_DIR)/fuzz_onyx_libfuzzer: $(ONYX_SRCS) examples/onyx/fuzz_onyx.cpp | $(BIN_DIR)
+	$(CXX) $(CXXFLAGS) -fsanitize=fuzzer,address,undefined -DFORGE_BUILD_LIBFUZZER -I native/include -I examples $^ -o $@
+
+fuzz_coverage: $(BIN_DIR)/fuzz_onyx_libfuzzer
+	@echo "--- Exécution du Fuzzing guidé par la couverture (libFuzzer) ---"
+	./$(BIN_DIR)/fuzz_onyx_libfuzzer -max_total_time=5
+
 bench: $(BIN_DIR)/bench_math_core
 	@echo "--- Exécution du banc Mercuria ---"
 	./$(BIN_DIR)/bench_math_core
